@@ -1,0 +1,305 @@
+import { useState, useCallback } from 'react';
+import {
+  View,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import { Text } from 'react-native-paper';
+import { Link } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { z } from 'zod';
+
+import { useAuth } from '@/src/core/providers/AuthProvider';
+import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { Input } from '@/src/shared/components/ui/Input';
+import { Button } from '@/src/shared/components/ui/Button';
+import { spacing } from '@/src/shared/theme';
+import { APP_NAME } from '@/src/core/config/constants';
+
+// ── Esquema de validacion ───────────────────────────────────────────────────
+
+const registerSchema = z
+  .object({
+    fullName: z
+      .string()
+      .min(2, 'El nombre debe tener al menos 2 caracteres.')
+      .max(100, 'El nombre es demasiado largo.'),
+    email: z
+      .string()
+      .min(1, 'El correo electronico es obligatorio.')
+      .email('Ingresa un correo electronico valido.'),
+    password: z
+      .string()
+      .min(6, 'La contrasena debe tener al menos 6 caracteres.')
+      .max(72, 'La contrasena es demasiado larga.'),
+    confirmPassword: z.string().min(1, 'Confirma tu contrasena.'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Las contrasenas no coinciden.',
+    path: ['confirmPassword'],
+  });
+
+// ── Tipos de errores de formulario ──────────────────────────────────────────
+
+interface FormErrors {
+  fullName?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+}
+
+// ── Componente ──────────────────────────────────────────────────────────────
+
+export default function RegisterScreen() {
+  const { signUp } = useAuth();
+  const { colors } = useAppTheme();
+
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [loading, setLoading] = useState(false);
+
+  const validate = useCallback((): boolean => {
+    const result = registerSchema.safeParse({
+      fullName,
+      email,
+      password,
+      confirmPassword,
+    });
+
+    if (!result.success) {
+      const fieldErrors: FormErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof FormErrors;
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = issue.message;
+        }
+      }
+      setErrors(fieldErrors);
+      return false;
+    }
+
+    setErrors({});
+    return true;
+  }, [fullName, email, password, confirmPassword]);
+
+  const handleRegister = useCallback(async () => {
+    if (!validate()) return;
+
+    setLoading(true);
+    try {
+      const { error } = await signUp(email.trim(), password, fullName.trim());
+      if (error) {
+        const messages: Record<string, string> = {
+          'User already registered': 'Ya existe una cuenta con este correo electronico.',
+          'Signup requires a valid password':
+            'La contrasena debe tener al menos 6 caracteres.',
+        };
+        Alert.alert(
+          'Error al crear cuenta',
+          messages[error.message] ?? error.message ?? 'Ocurrio un error inesperado.',
+        );
+      }
+      // Si se creo exitosamente sin sesion, AuthProvider o el signUp
+      // ya muestran un alert de confirmacion de email.
+    } catch {
+      Alert.alert('Error', 'No se pudo conectar al servidor. Intenta mas tarde.');
+    } finally {
+      setLoading(false);
+    }
+  }, [validate, email, password, fullName, signUp]);
+
+  // Limpiar error de un campo individual cuando cambia
+  const clearError = useCallback((field: keyof FormErrors) => {
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Encabezado ────────────────────────────────────────────── */}
+          <View style={styles.header}>
+            <Text
+              variant="displaySmall"
+              style={[styles.appName, { color: colors.primary }]}
+            >
+              {APP_NAME}
+            </Text>
+            <Text
+              variant="bodyMedium"
+              style={[styles.subtitle, { color: colors.textSecondary }]}
+            >
+              Crea tu cuenta para comenzar
+            </Text>
+          </View>
+
+          {/* ── Formulario ────────────────────────────────────────────── */}
+          <View style={[styles.form, { backgroundColor: colors.surface }]}>
+            <Text
+              variant="headlineSmall"
+              style={[styles.formTitle, { color: colors.text }]}
+            >
+              Crear Cuenta
+            </Text>
+
+            <Input
+              label="Nombre completo"
+              value={fullName}
+              onChangeText={(text) => {
+                setFullName(text);
+                clearError('fullName');
+              }}
+              placeholder="Juan Perez"
+              leftIcon="account-outline"
+              error={errors.fullName}
+              autoCapitalize="words"
+              autoComplete="name"
+              returnKeyType="next"
+              testID="register-name"
+            />
+
+            <Input
+              label="Correo electronico"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                clearError('email');
+              }}
+              placeholder="tu@correo.com"
+              leftIcon="email-outline"
+              error={errors.email}
+              keyboardType="email-address"
+              autoComplete="email"
+              autoCapitalize="none"
+              returnKeyType="next"
+              testID="register-email"
+            />
+
+            <Input
+              label="Contrasena"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                clearError('password');
+              }}
+              placeholder="Minimo 6 caracteres"
+              leftIcon="lock-outline"
+              error={errors.password}
+              secureTextEntry
+              autoComplete="new-password"
+              returnKeyType="next"
+              testID="register-password"
+            />
+
+            <Input
+              label="Confirmar contrasena"
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                clearError('confirmPassword');
+              }}
+              placeholder="Repite tu contrasena"
+              leftIcon="lock-check-outline"
+              error={errors.confirmPassword}
+              secureTextEntry
+              autoComplete="new-password"
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
+              testID="register-confirm-password"
+            />
+
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={loading}
+              disabled={loading}
+              onPress={handleRegister}
+              icon="account-plus"
+              testID="register-button"
+            >
+              Crear Cuenta
+            </Button>
+
+            {/* ── Enlace a login ──────────────────────────────────────── */}
+            <Link href="/(auth)/login" asChild>
+              <Text
+                variant="bodyMedium"
+                style={[styles.link, { color: colors.primary }]}
+              >
+                Ya tienes cuenta? Iniciar sesion
+              </Text>
+            </Link>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+// ── Estilos ─────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  appName: {
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  form: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  formTitle: {
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  link: {
+    textAlign: 'center',
+    marginTop: spacing.md,
+    fontWeight: '600',
+  },
+});

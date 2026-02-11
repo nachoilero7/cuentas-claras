@@ -1,0 +1,216 @@
+import { useCallback, useState } from 'react';
+import { View, StyleSheet, Alert } from 'react-native';
+import { Text, Divider } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+import { useAuth } from '@/src/core/providers/AuthProvider';
+import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { Button } from '@/src/shared/components/ui/Button';
+import { spacing } from '@/src/shared/theme';
+import { APP_NAME, APP_VERSION, USER_ROLE_LABELS, type UserRole } from '@/src/core/config/constants';
+
+export default function SettingsScreen() {
+  const { user, signOut } = useAuth();
+  const { colors } = useAppTheme();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const displayName =
+    user?.user_metadata?.full_name ??
+    user?.email?.split('@')[0] ??
+    'Usuario';
+
+  const displayEmail = user?.email ?? 'Sin correo';
+  const displayRole = user?.user_metadata?.role as UserRole | undefined;
+  const roleLabel = displayRole
+    ? (USER_ROLE_LABELS[displayRole] ?? displayRole)
+    : 'Visualizador';
+
+  const handleSignOut = useCallback(async () => {
+    Alert.alert(
+      'Cerrar sesion',
+      'Estas seguro que deseas cerrar tu sesion?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesion',
+          style: 'destructive',
+          onPress: async () => {
+            setLoggingOut(true);
+            try {
+              await signOut();
+            } finally {
+              setLoggingOut(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [signOut]);
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* ── Tarjeta de perfil ──────────────────────────────────────────── */}
+      <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.avatar, { backgroundColor: colors.primaryContainer }]}>
+          <MaterialCommunityIcons
+            name="account"
+            size={40}
+            color={colors.primary}
+          />
+        </View>
+
+        <Text
+          variant="titleLarge"
+          style={[styles.name, { color: colors.text }]}
+        >
+          {displayName}
+        </Text>
+
+        <Text
+          variant="bodyMedium"
+          style={{ color: colors.textSecondary }}
+        >
+          {displayEmail}
+        </Text>
+
+        <View style={[styles.roleBadge, { backgroundColor: colors.primaryContainer }]}>
+          <MaterialCommunityIcons
+            name="shield-account"
+            size={14}
+            color={colors.primary}
+          />
+          <Text
+            variant="labelSmall"
+            style={{ color: colors.primary, marginLeft: 4, fontWeight: '600' }}
+          >
+            {roleLabel}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Informacion de la app ─────────────────────────────────────── */}
+      <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+        <InfoRow
+          icon="information-outline"
+          label="Version"
+          value={`${APP_NAME} v${APP_VERSION}`}
+          colors={colors}
+        />
+        <Divider style={{ backgroundColor: colors.outlineVariant }} />
+        <InfoRow
+          icon="identifier"
+          label="ID de usuario"
+          value={user?.id?.substring(0, 8) ?? '---'}
+          colors={colors}
+        />
+      </View>
+
+      {/* ── Boton de cerrar sesion ────────────────────────────────────── */}
+      <View style={styles.logoutSection}>
+        <Button
+          variant="outline"
+          size="lg"
+          fullWidth
+          loading={loggingOut}
+          disabled={loggingOut}
+          onPress={handleSignOut}
+          icon="logout"
+        >
+          Cerrar Sesion
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+// ── Componente auxiliar ─────────────────────────────────────────────────────
+
+interface InfoRowProps {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  value: string;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+}
+
+function InfoRow({ icon, label, value, colors }: InfoRowProps) {
+  return (
+    <View style={styles.infoRow}>
+      <MaterialCommunityIcons
+        name={icon}
+        size={20}
+        color={colors.textTertiary}
+      />
+      <View style={styles.infoContent}>
+        <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
+          {label}
+        </Text>
+        <Text variant="bodyMedium" style={{ color: colors.text }}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Estilos ─────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  profileCard: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.smd,
+  },
+  name: {
+    fontWeight: '700',
+    marginBottom: spacing.xxs,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    marginTop: spacing.sm,
+  },
+  infoSection: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.smd,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  logoutSection: {
+    marginTop: 'auto',
+    paddingBottom: spacing.md,
+  },
+});
