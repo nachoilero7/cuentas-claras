@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, Pressable } from 'react-native';
 import { Text, Divider, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -125,6 +126,35 @@ export default function SettingsScreen() {
           </>
         )}
       </View>
+
+      {/* ── Administracion (solo admin) ──────────────────────────────── */}
+      {role === 'admin' && (
+        <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+          <Pressable
+            style={styles.infoRow}
+            onPress={() => router.push('/users')}
+          >
+            <MaterialCommunityIcons
+              name="account-group"
+              size={20}
+              color={colors.primary}
+            />
+            <View style={styles.infoContent}>
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                Gestionar usuarios
+              </Text>
+              <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                Roles y permisos por rubro
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={colors.textTertiary}
+            />
+          </Pressable>
+        </View>
+      )}
 
       {/* ── Boton de cerrar sesion ────────────────────────────────────── */}
       <View style={styles.logoutSection}>
