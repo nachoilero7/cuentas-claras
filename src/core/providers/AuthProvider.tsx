@@ -24,8 +24,9 @@ interface AuthActions {
     email: string,
     password: string,
     fullName: string
-  ) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>;
   signOut: () => Promise<{ error: AuthError | null }>;
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
 type AuthContextValue = AuthState & AuthActions;
@@ -45,7 +46,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Escuchar cambios en el estado de autenticacion de Supabase
   useEffect(() => {
-    // Obtener la sesion actual al montar
     const getInitialSession = async () => {
       try {
         const {
@@ -62,7 +62,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     getInitialSession();
 
-    // Suscribirse a cambios de autenticacion
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -97,9 +96,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       email: string,
       password: string,
       fullName: string
-    ): Promise<{ error: AuthError | null }> => {
+    ): Promise<{ error: AuthError | null; needsConfirmation: boolean }> => {
       try {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -108,10 +107,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             },
           },
         });
-        return { error };
+        // Si Supabase retorna un usuario sin sesion, requiere confirmacion de email
+        const needsConfirmation = !error && !!data.user && !data.session;
+        return { error, needsConfirmation };
       } catch (error) {
         console.error('[Auth] Error inesperado en signUp:', error);
-        return { error: error as AuthError };
+        return { error: error as AuthError, needsConfirmation: false };
       }
     },
     []
@@ -127,6 +128,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  const resetPassword = useCallback(
+    async (email: string): Promise<{ error: AuthError | null }> => {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        return { error };
+      } catch (error) {
+        console.error('[Auth] Error inesperado en resetPassword:', error);
+        return { error: error as AuthError };
+      }
+    },
+    []
+  );
+
   const isAuthenticated = !!session?.user;
 
   const value = useMemo<AuthContextValue>(
@@ -138,8 +152,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       signIn,
       signUp,
       signOut,
+      resetPassword,
     }),
-    [session, user, isLoading, isAuthenticated, signIn, signUp, signOut]
+    [session, user, isLoading, isAuthenticated, signIn, signUp, signOut, resetPassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

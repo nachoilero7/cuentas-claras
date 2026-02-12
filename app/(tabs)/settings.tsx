@@ -1,29 +1,33 @@
 import { useCallback, useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Text, Divider } from 'react-native-paper';
+import { Text, Divider, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing } from '@/src/shared/theme';
-import { APP_NAME, APP_VERSION, USER_ROLE_LABELS, type UserRole } from '@/src/core/config/constants';
+import { APP_NAME, APP_VERSION, USER_ROLE_LABELS } from '@/src/core/config/constants';
+import type { UserRole } from '@/src/core/types/database';
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { colors } = useAppTheme();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const [loggingOut, setLoggingOut] = useState(false);
 
+  // Usar datos del perfil de DB, con fallback a metadata de auth
   const displayName =
+    profile?.display_name ??
+    profile?.full_name ??
     user?.user_metadata?.full_name ??
     user?.email?.split('@')[0] ??
     'Usuario';
 
-  const displayEmail = user?.email ?? 'Sin correo';
-  const displayRole = user?.user_metadata?.role as UserRole | undefined;
-  const roleLabel = displayRole
-    ? (USER_ROLE_LABELS[displayRole] ?? displayRole)
-    : 'Visualizador';
+  const displayEmail = profile?.email ?? user?.email ?? 'Sin correo';
+  const role: UserRole = profile?.role ?? 'viewer';
+  const roleLabel = USER_ROLE_LABELS[role] ?? role;
 
   const handleSignOut = useCallback(async () => {
     Alert.alert(
@@ -59,33 +63,39 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <Text
-          variant="titleLarge"
-          style={[styles.name, { color: colors.text }]}
-        >
-          {displayName}
-        </Text>
+        {profileLoading ? (
+          <ActivityIndicator size="small" style={{ marginVertical: spacing.sm }} />
+        ) : (
+          <>
+            <Text
+              variant="titleLarge"
+              style={[styles.name, { color: colors.text }]}
+            >
+              {displayName}
+            </Text>
 
-        <Text
-          variant="bodyMedium"
-          style={{ color: colors.textSecondary }}
-        >
-          {displayEmail}
-        </Text>
+            <Text
+              variant="bodyMedium"
+              style={{ color: colors.textSecondary }}
+            >
+              {displayEmail}
+            </Text>
 
-        <View style={[styles.roleBadge, { backgroundColor: colors.primaryContainer }]}>
-          <MaterialCommunityIcons
-            name="shield-account"
-            size={14}
-            color={colors.primary}
-          />
-          <Text
-            variant="labelSmall"
-            style={{ color: colors.primary, marginLeft: 4, fontWeight: '600' }}
-          >
-            {roleLabel}
-          </Text>
-        </View>
+            <View style={[styles.roleBadge, { backgroundColor: colors.primaryContainer }]}>
+              <MaterialCommunityIcons
+                name="shield-account"
+                size={14}
+                color={colors.primary}
+              />
+              <Text
+                variant="labelSmall"
+                style={{ color: colors.primary, marginLeft: 4, fontWeight: '600' }}
+              >
+                {roleLabel}
+              </Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* ── Informacion de la app ─────────────────────────────────────── */}
@@ -103,6 +113,17 @@ export default function SettingsScreen() {
           value={user?.id?.substring(0, 8) ?? '---'}
           colors={colors}
         />
+        {profile?.phone && (
+          <>
+            <Divider style={{ backgroundColor: colors.outlineVariant }} />
+            <InfoRow
+              icon="phone-outline"
+              label="Telefono"
+              value={profile.phone}
+              colors={colors}
+            />
+          </>
+        )}
       </View>
 
       {/* ── Boton de cerrar sesion ────────────────────────────────────── */}

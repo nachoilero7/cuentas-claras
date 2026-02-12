@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
@@ -147,12 +147,7 @@ export default function LoginScreen() {
             <Text
               variant="bodySmall"
               style={[styles.forgotPassword, { color: colors.textTertiary }]}
-              onPress={() =>
-                Alert.alert(
-                  'Recuperar contrasena',
-                  'Proximamente podras recuperar tu contrasena desde aqui.',
-                )
-              }
+              onPress={() => router.push('/(auth)/forgot-password')}
             >
               Olvidaste tu contrasena?
             </Text>
