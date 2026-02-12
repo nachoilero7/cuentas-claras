@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, StyleSheet, Alert, Pressable, TextInput } from 'react-native';
 import { Text, Divider, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme, type ThemeMode } from '@/src/core/providers/ThemeProvider';
-import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useProfile, useUpdateProfile } from '@/src/features/auth/hooks/useProfile';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing } from '@/src/shared/theme';
 import { APP_NAME, APP_VERSION, USER_ROLE_LABELS } from '@/src/core/config/constants';
@@ -16,7 +16,10 @@ export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { colors, themeMode, setThemeMode } = useAppTheme();
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const updateProfile = useUpdateProfile();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [editingAlias, setEditingAlias] = useState(false);
+  const [aliasValue, setAliasValue] = useState('');
 
   // Usar datos del perfil de DB, con fallback a metadata de auth
   const displayName =
@@ -51,6 +54,22 @@ export default function SettingsScreen() {
       ],
     );
   }, [signOut]);
+
+  const handleEditAlias = useCallback(() => {
+    setAliasValue(profile?.payment_alias ?? '');
+    setEditingAlias(true);
+  }, [profile?.payment_alias]);
+
+  const handleSaveAlias = useCallback(async () => {
+    try {
+      await updateProfile.mutateAsync({
+        payment_alias: aliasValue.trim() || null,
+      });
+      setEditingAlias(false);
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar el alias de pago.');
+    }
+  }, [aliasValue, updateProfile]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -125,6 +144,89 @@ export default function SettingsScreen() {
             />
           </>
         )}
+      </View>
+
+      {/* ── Alias de pago ───────────────────────────────────────────── */}
+      <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+        <View style={styles.themeSectionHeader}>
+          <MaterialCommunityIcons
+            name="bank-transfer"
+            size={20}
+            color={colors.primary}
+          />
+          <Text variant="bodyMedium" style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '600' }}>
+            Alias de pago
+          </Text>
+        </View>
+        <Divider style={{ backgroundColor: colors.outlineVariant }} />
+        {editingAlias ? (
+          <View style={styles.aliasEditContainer}>
+            <TextInput
+              style={[
+                styles.aliasInput,
+                {
+                  color: colors.text,
+                  backgroundColor: colors.surfaceVariant,
+                  borderColor: colors.primary,
+                },
+              ]}
+              value={aliasValue}
+              onChangeText={setAliasValue}
+              placeholder="Ej: mi.alias.uala o CBU/CVU"
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.aliasActions}>
+              <Pressable
+                style={[styles.aliasActionBtn, { backgroundColor: colors.surfaceVariant }]}
+                onPress={() => setEditingAlias(false)}
+              >
+                <Text variant="labelMedium" style={{ color: colors.textSecondary }}>
+                  Cancelar
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.aliasActionBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSaveAlias}
+              >
+                <Text variant="labelMedium" style={{ color: colors.onPrimary, fontWeight: '600' }}>
+                  {updateProfile.isPending ? 'Guardando...' : 'Guardar'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Pressable style={styles.infoRow} onPress={handleEditAlias}>
+            <MaterialCommunityIcons
+              name="wallet-outline"
+              size={20}
+              color={colors.textTertiary}
+            />
+            <View style={styles.infoContent}>
+              <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
+                CBU / CVU / Alias
+              </Text>
+              <Text
+                variant="bodyMedium"
+                style={{ color: profile?.payment_alias ? colors.text : colors.textTertiary }}
+              >
+                {profile?.payment_alias ?? 'No configurado - Toca para agregar'}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="pencil-outline"
+              size={18}
+              color={colors.textTertiary}
+            />
+          </Pressable>
+        )}
+        <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.smd }}>
+          <Text variant="bodySmall" style={{ color: colors.textTertiary, lineHeight: 18 }}>
+            Este alias sera visible para otros usuarios cuando necesiten realizarte una transferencia.
+          </Text>
+        </View>
       </View>
 
       {/* ── Selector de tema ────────────────────────────────────────── */}
@@ -429,6 +531,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     gap: spacing.xs,
+  },
+  aliasEditContainer: {
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  aliasInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.sm,
+    fontSize: 15,
+  },
+  aliasActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
+  },
+  aliasActionBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
   },
   logoutSection: {
     marginTop: 'auto',

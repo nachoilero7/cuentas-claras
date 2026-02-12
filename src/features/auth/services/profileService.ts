@@ -2,7 +2,7 @@ import { supabase } from '@/src/core/config/supabase';
 import type { Profile, UserRole } from '@/src/core/types/database';
 
 // Campos editables por el propio usuario
-type ProfileUpdateData = Pick<Profile, 'display_name' | 'phone' | 'avatar_url'>;
+type ProfileUpdateData = Pick<Profile, 'display_name' | 'phone' | 'avatar_url' | 'payment_alias'>;
 
 // ─── Obtener perfil del usuario autenticado ─────────────────────────────────
 

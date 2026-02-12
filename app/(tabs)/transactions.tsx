@@ -20,7 +20,7 @@ import { Button } from '@/src/shared/components/ui/Button';
 import { EmptyState } from '@/src/shared/components/feedback/EmptyState';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { formatDate } from '@/src/core/utils/date';
-import { TRANSACTION_TYPE_LABELS } from '@/src/core/config/constants';
+import { TRANSACTION_TYPE_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_ICONS } from '@/src/core/config/constants';
 import { spacing } from '@/src/shared/theme';
 import type { TransactionType, CurrencyCode } from '@/src/core/types/database';
 
@@ -335,12 +335,29 @@ function TransactionCard({ transaction, colors, onPress }: TransactionCardProps)
             {subtitle}
           </Text>
 
-          <Text
-            variant="labelSmall"
-            style={{ color: colors.textTertiary }}
-          >
-            {formatDate(transaction.transaction_date)}
-          </Text>
+          <View style={styles.metaRow}>
+            <Text
+              variant="labelSmall"
+              style={{ color: colors.textTertiary }}
+            >
+              {formatDate(transaction.transaction_date)}
+            </Text>
+            {transaction.payment_method && (
+              <View style={styles.paymentMethodBadge}>
+                <MaterialCommunityIcons
+                  name={PAYMENT_METHOD_ICONS[transaction.payment_method] as keyof typeof MaterialCommunityIcons.glyphMap}
+                  size={12}
+                  color={colors.textTertiary}
+                />
+                <Text
+                  variant="labelSmall"
+                  style={{ color: colors.textTertiary, fontSize: 10 }}
+                >
+                  {PAYMENT_METHOD_LABELS[transaction.payment_method]}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Monto y estado */}
@@ -464,6 +481,16 @@ const styles = StyleSheet.create({
   },
   description: {
     fontWeight: '600',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  paymentMethodBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   amountContainer: {
     alignItems: 'flex-end',

@@ -5,6 +5,7 @@ import type {
   TransactionType,
   TransactionStatus,
   CurrencyCode,
+  PaymentMethod,
 } from '@/src/core/types/database';
 
 // ─── Tipos para transacciones con datos de categoria ────────────────────────
@@ -21,6 +22,7 @@ export type CreateTransactionData = {
   exchange_rate?: number | null;
   description: string;
   notes?: string | null;
+  payment_method?: PaymentMethod | null;
   category_id: string;
   transfer_to_category_id?: string | null;
   transaction_date: string;
