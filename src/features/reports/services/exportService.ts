@@ -12,6 +12,7 @@ export interface ExportTransaction {
   amount: number;
   currency: string;
   status: string;
+  payment_method?: string | null;
 }
 
 // ── Tipos para exportacion de balances por categoria ────────────────────────

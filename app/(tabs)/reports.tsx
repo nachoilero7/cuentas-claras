@@ -8,6 +8,7 @@ import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
 import { useReportSummary, useCategoryReport, useTransactionsForExport } from '@/src/features/reports/hooks/useReports';
 import { exportTransactionsToExcel } from '@/src/features/reports/services/exportService';
+import { exportReportToPdf } from '@/src/features/reports/services/exportPdfService';
 import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
 import { formatCurrency } from '@/src/core/utils/currency';
@@ -125,6 +126,8 @@ export default function ReportsScreen() {
     setShowFilters((prev) => !prev);
   }, []);
 
+  const [pdfExporting, setPdfExporting] = useState(false);
+
   const handleExport = useCallback(async () => {
     try {
       const result = await refetchExport();
@@ -143,6 +146,7 @@ export default function ReportsScreen() {
         amount: t.amount,
         currency: t.currency,
         status: t.status,
+        payment_method: t.payment_method ?? null,
       }));
 
       await exportTransactionsToExcel(exportData, {
@@ -155,6 +159,46 @@ export default function ReportsScreen() {
       Alert.alert('Error al exportar', message);
     }
   }, [refetchExport, startDate, endDate, typeFilter]);
+
+  const handleExportPdf = useCallback(async () => {
+    setPdfExporting(true);
+    try {
+      const result = await refetchExport();
+      const transactions = result.data;
+
+      if (!transactions || transactions.length === 0) {
+        Alert.alert('Sin datos', 'No hay transacciones para generar el reporte PDF.');
+        return;
+      }
+
+      const exportData: ExportTransaction[] = transactions.map((t: any) => ({
+        transaction_date: t.transaction_date,
+        type: t.type,
+        description: t.description,
+        category_name: t.category?.name ?? 'Sin rubro',
+        amount: t.amount,
+        currency: t.currency,
+        status: t.status,
+        payment_method: t.payment_method ?? null,
+      }));
+
+      await exportReportToPdf({
+        summary: summary!,
+        categoryReport: categoryReport ?? [],
+        transactions: exportData,
+        filters: {
+          startDate,
+          endDate,
+          type: typeFilter,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ocurrio un error inesperado al generar el PDF.';
+      Alert.alert('Error al exportar PDF', message);
+    } finally {
+      setPdfExporting(false);
+    }
+  }, [refetchExport, summary, categoryReport, startDate, endDate, typeFilter]);
 
   // ── Balance color dinamico ──────────────────────────────────────────────
   const balanceColor = useMemo(() => {
@@ -591,6 +635,17 @@ export default function ReportsScreen() {
           variant="primary"
           size="lg"
           fullWidth
+          icon="file-pdf-box"
+          onPress={handleExportPdf}
+          loading={pdfExporting}
+          disabled={pdfExporting || !summary}
+        >
+          Exportar a PDF
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          fullWidth
           icon="file-excel-outline"
           onPress={handleExport}
           loading={exportFetching}
@@ -771,5 +826,6 @@ const styles = StyleSheet.create({
   // ── Exportacion ──────────────────────────────────────────────────────────
   exportSection: {
     marginTop: spacing.sm,
+    gap: spacing.smd,
   },
 });
