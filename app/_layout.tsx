@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import '../global.css';
 
+import { initSentry } from '@/src/core/config/sentry';
 import { QueryProvider } from '@/src/core/providers/QueryProvider';
 import { ThemeProvider } from '@/src/core/providers/ThemeProvider';
 import { AuthProvider } from '@/src/core/providers/AuthProvider';
@@ -20,6 +21,9 @@ export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from 'expo-router';
+
+// Inicializar Sentry para error tracking
+initSentry();
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
