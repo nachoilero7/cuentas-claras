@@ -5,6 +5,7 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -407,7 +408,10 @@ export default function DashboardScreen() {
           </Text>
         </View>
         {(summary?.pending_approvals ?? 0) > 0 && (
-          <View style={[styles.counterChip, { backgroundColor: colors.surface }]}>
+          <Pressable
+            style={[styles.counterChip, { backgroundColor: colors.surface }]}
+            onPress={() => router.push('/approvals')}
+          >
             <MaterialCommunityIcons
               name="clock-outline"
               size={18}
@@ -419,7 +423,7 @@ export default function DashboardScreen() {
             >
               {summary?.pending_approvals} pendientes
             </Text>
-          </View>
+          </Pressable>
         )}
       </View>
 
