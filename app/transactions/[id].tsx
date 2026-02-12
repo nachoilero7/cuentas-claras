@@ -29,9 +29,13 @@ import { sendPushToAdmins } from '@/src/core/services/pushNotifications';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
-import { TRANSACTION_TYPE_LABELS } from '@/src/core/config/constants';
+import {
+  TRANSACTION_TYPE_LABELS,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHOD_ICONS,
+} from '@/src/core/config/constants';
 import { spacing } from '@/src/shared/theme';
-import type { TransactionType, CurrencyCode } from '@/src/core/types/database';
+import type { TransactionType, CurrencyCode, PaymentMethod } from '@/src/core/types/database';
 
 // ── Colores financieros ─────────────────────────────────────────────────────
 
@@ -57,6 +61,13 @@ const TYPE_OPTIONS: TypeOption[] = [
 ];
 
 const CURRENCY_OPTIONS: CurrencyCode[] = ['ARS', 'USD'];
+
+const PAYMENT_METHOD_OPTIONS: { key: PaymentMethod; label: string; icon: string }[] = [
+  { key: 'cash', label: PAYMENT_METHOD_LABELS.cash, icon: PAYMENT_METHOD_ICONS.cash },
+  { key: 'bank_transfer', label: PAYMENT_METHOD_LABELS.bank_transfer, icon: PAYMENT_METHOD_ICONS.bank_transfer },
+  { key: 'digital_wallet', label: PAYMENT_METHOD_LABELS.digital_wallet, icon: PAYMENT_METHOD_ICONS.digital_wallet },
+  { key: 'check', label: PAYMENT_METHOD_LABELS.check, icon: PAYMENT_METHOD_ICONS.check },
+];
 
 // ── Esquema de validacion con Zod ───────────────────────────────────────────
 
@@ -163,6 +174,7 @@ export default function TransactionFormScreen() {
   const [categoryId, setCategoryId] = useState('');
   const [transferToCategoryId, setTransferToCategoryId] = useState('');
   const [transactionDate, setTransactionDate] = useState(getTodayFormatted());
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
 
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -181,6 +193,7 @@ export default function TransactionFormScreen() {
       setCategoryId(transaction.category_id ?? '');
       setTransferToCategoryId(transaction.transfer_to_category_id ?? '');
       setTransactionDate(formatISOToDisplay(transaction.transaction_date));
+      setPaymentMethod(transaction.payment_method ?? 'cash');
     }
   }, [isCreateMode, transaction]);
 
@@ -270,6 +283,7 @@ export default function TransactionFormScreen() {
           : null,
       description: description.trim(),
       notes: notes.trim() || null,
+      payment_method: paymentMethod,
       category_id: categoryId,
       transfer_to_category_id: type === 'transfer' ? transferToCategoryId : null,
       transaction_date: parseDateToISO(transactionDate),
@@ -603,6 +617,54 @@ export default function TransactionFormScreen() {
               autoCapitalize="sentences"
             />
 
+            {/* ── Metodo de pago ──────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text
+                variant="labelLarge"
+                style={[styles.sectionLabel, { color: colors.textSecondary }]}
+              >
+                Metodo de pago
+              </Text>
+              <View style={styles.paymentMethodGrid}>
+                {PAYMENT_METHOD_OPTIONS.map((option) => {
+                  const isSelected = paymentMethod === option.key;
+                  return (
+                    <Pressable
+                      key={option.key}
+                      style={[
+                        styles.paymentMethodCard,
+                        {
+                          backgroundColor: isSelected
+                            ? colors.primary + '15'
+                            : colors.surfaceVariant,
+                          borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                          borderWidth: isSelected ? 2 : 1,
+                        },
+                      ]}
+                      onPress={() => setPaymentMethod(option.key)}
+                    >
+                      <MaterialCommunityIcons
+                        name={option.icon as any}
+                        size={20}
+                        color={isSelected ? colors.primary : colors.textTertiary}
+                      />
+                      <Text
+                        variant="labelSmall"
+                        style={{
+                          color: isSelected ? colors.primary : colors.textSecondary,
+                          fontWeight: isSelected ? '700' : '500',
+                          textAlign: 'center',
+                        }}
+                        numberOfLines={2}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* ── Rubro ──────────────────────────────────────────────── */}
             <View style={styles.section}>
               <Text
@@ -859,6 +921,20 @@ const styles = StyleSheet.create({
   categoryChipsContainer: {
     gap: spacing.sm,
     paddingVertical: spacing.xs,
+  },
+  paymentMethodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  paymentMethodCard: {
+    width: '47%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.smd,
+    borderRadius: 10,
   },
   categoryChip: {
     borderRadius: 20,

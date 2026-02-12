@@ -6,6 +6,7 @@ export type TransactionStatus = 'pending' | 'approved' | 'rejected';
 export type CurrencyCode = 'ARS' | 'USD';
 export type SeasonStatus = 'active' | 'closed' | 'planning';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'digital_wallet' | 'check';
 export type AuditAction =
   | 'create' | 'update' | 'delete'
   | 'approve' | 'reject'
@@ -23,6 +24,7 @@ export interface Profile {
   avatar_url: string | null;
   role: UserRole;
   phone: string | null;
+  payment_alias: string | null;
   is_active: boolean;
   last_login_at: string | null;
   created_at: string;
@@ -89,6 +91,7 @@ export interface Transaction {
   amount_in_ars: number | null;
   description: string;
   notes: string | null;
+  payment_method: PaymentMethod | null;
   category_id: string;
   transfer_to_category_id: string | null;
   transaction_date: string;

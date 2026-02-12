@@ -71,3 +71,29 @@ export const TRANSACTION_STATUS_LABELS: Record<TransactionStatus, string> = {
   approved: 'Aprobada',
   rejected: 'Rechazada',
 };
+
+// ─── Metodos de pago ───────────────────────────────────────────────────────
+
+export const PaymentMethods = {
+  CASH: 'cash',
+  BANK_TRANSFER: 'bank_transfer',
+  DIGITAL_WALLET: 'digital_wallet',
+  CHECK: 'check',
+} as const;
+
+export type PaymentMethod =
+  (typeof PaymentMethods)[keyof typeof PaymentMethods];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  bank_transfer: 'Transferencia bancaria',
+  digital_wallet: 'Billetera virtual',
+  check: 'Cheque',
+};
+
+export const PAYMENT_METHOD_ICONS: Record<PaymentMethod, string> = {
+  cash: 'cash',
+  bank_transfer: 'bank-transfer',
+  digital_wallet: 'cellphone',
+  check: 'checkbook',
+};

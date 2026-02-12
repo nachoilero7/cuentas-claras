@@ -36,7 +36,7 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async (
-      updates: Partial<Pick<Profile, 'display_name' | 'phone' | 'avatar_url'>>
+      updates: Partial<Pick<Profile, 'display_name' | 'phone' | 'avatar_url' | 'payment_alias'>>
     ) => {
       if (!user?.id) throw new Error('Usuario no autenticado');
       const { data, error } = await updateProfile(user.id, updates);
