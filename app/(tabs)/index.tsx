@@ -254,7 +254,7 @@ export default function DashboardScreen() {
 
   // Rol del usuario
   const userRole = profile?.role ?? 'viewer';
-  const canCreateTransactions = userRole === 'admin' || userRole === 'manager';
+  const isAdmin = userRole === 'admin';
 
   // Fecha actual
   const currentDate = useMemo(() => getCurrentDateLabel(), []);
@@ -348,229 +348,281 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* ── Error state ────────────────────────────────────────────────────── */}
-      {summaryError && (
-        <Card variant="outlined" padding="md" style={styles.sectionCard}>
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons
-              name="alert-circle-outline"
-              size={32}
-              color={colors.error}
+      {/* ── Contenido para administradores (datos financieros completos) ── */}
+      {isAdmin && (
+        <>
+          {/* ── Error state ────────────────────────────────────────────── */}
+          {summaryError && (
+            <Card variant="outlined" padding="md" style={styles.sectionCard}>
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons
+                  name="alert-circle-outline"
+                  size={32}
+                  color={colors.error}
+                />
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: colors.error, marginTop: spacing.sm }}
+                >
+                  Error al cargar el resumen
+                </Text>
+              </View>
+            </Card>
+          )}
+
+          {/* ── Tarjetas de resumen ──────────────────────────────────── */}
+          <View style={styles.summaryRow}>
+            <SummaryCard
+              label="Ingresos"
+              amount={summary?.total_income_ars ?? 0}
+              color={FINANCIAL_COLORS.income}
+              iconName="trending-up"
+              backgroundColor={colors.surface}
+              textColor={colors.textSecondary}
             />
-            <Text
-              variant="bodyMedium"
-              style={{ color: colors.error, marginTop: spacing.sm }}
-            >
-              Error al cargar el resumen
-            </Text>
+            <SummaryCard
+              label="Egresos"
+              amount={summary?.total_expenses_ars ?? 0}
+              color={FINANCIAL_COLORS.expense}
+              iconName="trending-down"
+              backgroundColor={colors.surface}
+              textColor={colors.textSecondary}
+            />
+            <SummaryCard
+              label="Balance"
+              amount={summary?.net_balance_ars ?? 0}
+              color={balanceColor}
+              iconName="scale-balance"
+              backgroundColor={colors.surface}
+              textColor={colors.textSecondary}
+            />
           </View>
-        </Card>
+
+          {/* ── Fila secundaria: contadores ──────────────────────────── */}
+          <View style={styles.countersRow}>
+            <View style={[styles.counterChip, { backgroundColor: colors.surface }]}>
+              <MaterialCommunityIcons
+                name="swap-horizontal"
+                size={18}
+                color={colors.primary}
+              />
+              <Text variant="labelMedium" style={{ color: colors.text, marginLeft: spacing.xs }}>
+                {summary?.transaction_count ?? 0} movimientos
+              </Text>
+            </View>
+            {(summary?.pending_approvals ?? 0) > 0 && (
+              <Pressable
+                style={[styles.counterChip, { backgroundColor: colors.surface }]}
+                onPress={() => router.push('/approvals')}
+              >
+                <MaterialCommunityIcons
+                  name="clock-outline"
+                  size={18}
+                  color="#f59e0b"
+                />
+                <Text
+                  variant="labelMedium"
+                  style={{ color: '#f59e0b', marginLeft: spacing.xs, fontWeight: '600' }}
+                >
+                  {summary?.pending_approvals} pendientes
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* ── Grafico mensual: Ingresos vs Egresos ─────────────────── */}
+          <Card variant="elevated" padding="md" style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons
+                name="chart-bar"
+                size={22}
+                color={colors.primary}
+              />
+              <Text
+                variant="titleMedium"
+                style={[styles.sectionTitle, { color: colors.text }]}
+              >
+                Ingresos vs Egresos (ultimos 6 meses)
+              </Text>
+            </View>
+
+            {/* Leyenda */}
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: FINANCIAL_COLORS.income }]}
+                />
+                <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
+                  Ingresos
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: FINANCIAL_COLORS.expense }]}
+                />
+                <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
+                  Egresos
+                </Text>
+              </View>
+            </View>
+
+            {monthlyLoading ? (
+              <View style={styles.chartLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : !monthlyData || monthlyData.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons
+                  name="chart-line-variant"
+                  size={40}
+                  color={colors.textTertiary}
+                />
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: colors.textSecondary, marginTop: spacing.sm }}
+                >
+                  Sin datos mensuales
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.chartContainer}>
+                {monthlyData.map((month) => (
+                  <MonthBar
+                    key={month.month}
+                    label={month.label}
+                    income={month.income}
+                    expenses={month.expenses}
+                    maxValue={monthlyMaxValue}
+                  />
+                ))}
+              </View>
+            )}
+          </Card>
+
+          {/* ── Distribucion de egresos por categoria ─────────────────── */}
+          <Card variant="elevated" padding="md" style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons
+                name="tag-multiple"
+                size={22}
+                color={colors.primary}
+              />
+              <Text
+                variant="titleMedium"
+                style={[styles.sectionTitle, { color: colors.text }]}
+              >
+                Distribucion de egresos
+              </Text>
+            </View>
+
+            {categoryLoading ? (
+              <View style={styles.chartLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : !categoryData || categoryData.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons
+                  name="tag-off-outline"
+                  size={40}
+                  color={colors.textTertiary}
+                />
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: colors.textSecondary, marginTop: spacing.sm }}
+                >
+                  Sin datos de egresos
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.categoryList}>
+                {categoryData.map((cat) => (
+                  <CategoryRow
+                    key={cat.category_id}
+                    name={cat.category_name}
+                    amount={cat.total_ars}
+                    percentage={categoryTotal > 0 ? (cat.total_ars / categoryTotal) * 100 : 0}
+                    color={cat.color ?? FINANCIAL_COLORS.expense}
+                    icon={cat.icon}
+                    surfaceColor={colors.surfaceVariant}
+                    textColor={colors.text}
+                    secondaryTextColor={colors.textSecondary}
+                  />
+                ))}
+              </View>
+            )}
+          </Card>
+
+          {/* ── Acciones rapidas (admin) ──────────────────────────────── */}
+          <View style={styles.quickActions}>
+            <Button
+              variant="primary"
+              icon="plus-circle-outline"
+              fullWidth
+              onPress={() => router.push('/transactions/new')}
+              style={styles.quickActionButton}
+            >
+              Nuevo Movimiento
+            </Button>
+            <Button
+              variant="outline"
+              icon="tag-outline"
+              fullWidth
+              onPress={() => router.push('/(tabs)/categories')}
+              style={styles.quickActionButton}
+            >
+              Ver Rubros
+            </Button>
+          </View>
+        </>
       )}
 
-      {/* ── Tarjetas de resumen ────────────────────────────────────────────── */}
-      <View style={styles.summaryRow}>
-        <SummaryCard
-          label="Ingresos"
-          amount={summary?.total_income_ars ?? 0}
-          color={FINANCIAL_COLORS.income}
-          iconName="trending-up"
-          backgroundColor={colors.surface}
-          textColor={colors.textSecondary}
-        />
-        <SummaryCard
-          label="Egresos"
-          amount={summary?.total_expenses_ars ?? 0}
-          color={FINANCIAL_COLORS.expense}
-          iconName="trending-down"
-          backgroundColor={colors.surface}
-          textColor={colors.textSecondary}
-        />
-        <SummaryCard
-          label="Balance"
-          amount={summary?.net_balance_ars ?? 0}
-          color={balanceColor}
-          iconName="scale-balance"
-          backgroundColor={colors.surface}
-          textColor={colors.textSecondary}
-        />
-      </View>
+      {/* ── Contenido para usuarios no-admin (vista simplificada) ────────── */}
+      {!isAdmin && (
+        <>
+          {/* ── Informacion sobre permisos ──────────────────────────── */}
+          <Card variant="outlined" padding="md" style={styles.sectionCard}>
+            <View style={styles.infoSection}>
+              <View style={[styles.infoIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <MaterialCommunityIcons name="shield-check-outline" size={32} color={colors.primary} />
+              </View>
+              <Text
+                variant="titleSmall"
+                style={{ color: colors.text, textAlign: 'center', fontWeight: '600' }}
+              >
+                Registra tus movimientos
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: colors.textSecondary, textAlign: 'center', lineHeight: 20 }}
+              >
+                Podes crear movimientos en cualquier rubro. Cada movimiento sera revisado y aprobado por un administrador.
+              </Text>
+            </View>
+          </Card>
 
-      {/* ── Fila secundaria: contadores ────────────────────────────────────── */}
-      <View style={styles.countersRow}>
-        <View style={[styles.counterChip, { backgroundColor: colors.surface }]}>
-          <MaterialCommunityIcons
-            name="swap-horizontal"
-            size={18}
-            color={colors.primary}
-          />
-          <Text variant="labelMedium" style={{ color: colors.text, marginLeft: spacing.xs }}>
-            {summary?.transaction_count ?? 0} movimientos
-          </Text>
-        </View>
-        {(summary?.pending_approvals ?? 0) > 0 && (
-          <Pressable
-            style={[styles.counterChip, { backgroundColor: colors.surface }]}
-            onPress={() => router.push('/approvals')}
-          >
-            <MaterialCommunityIcons
-              name="clock-outline"
-              size={18}
-              color="#f59e0b"
-            />
-            <Text
-              variant="labelMedium"
-              style={{ color: '#f59e0b', marginLeft: spacing.xs, fontWeight: '600' }}
-            >
-              {summary?.pending_approvals} pendientes
-            </Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* ── Grafico mensual: Ingresos vs Egresos ───────────────────────────── */}
-      <Card variant="elevated" padding="md" style={styles.sectionCard}>
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="chart-bar"
-            size={22}
-            color={colors.primary}
-          />
-          <Text
-            variant="titleMedium"
-            style={[styles.sectionTitle, { color: colors.text }]}
-          >
-            Ingresos vs Egresos (ultimos 6 meses)
-          </Text>
-        </View>
-
-        {/* Leyenda */}
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendDot, { backgroundColor: FINANCIAL_COLORS.income }]}
-            />
-            <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
-              Ingresos
-            </Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendDot, { backgroundColor: FINANCIAL_COLORS.expense }]}
-            />
-            <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
-              Egresos
-            </Text>
-          </View>
-        </View>
-
-        {monthlyLoading ? (
-          <View style={styles.chartLoading}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : !monthlyData || monthlyData.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons
-              name="chart-line-variant"
-              size={40}
-              color={colors.textTertiary}
-            />
-            <Text
-              variant="bodyMedium"
-              style={{ color: colors.textSecondary, marginTop: spacing.sm }}
-            >
-              Sin datos mensuales
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.chartContainer}>
-            {monthlyData.map((month) => (
-              <MonthBar
-                key={month.month}
-                label={month.label}
-                income={month.income}
-                expenses={month.expenses}
-                maxValue={monthlyMaxValue}
-              />
-            ))}
-          </View>
-        )}
-      </Card>
-
-      {/* ── Distribucion de egresos por categoria ──────────────────────────── */}
-      <Card variant="elevated" padding="md" style={styles.sectionCard}>
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="tag-multiple"
-            size={22}
-            color={colors.primary}
-          />
-          <Text
-            variant="titleMedium"
-            style={[styles.sectionTitle, { color: colors.text }]}
-          >
-            Distribucion de egresos
-          </Text>
-        </View>
-
-        {categoryLoading ? (
-          <View style={styles.chartLoading}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : !categoryData || categoryData.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons
-              name="tag-off-outline"
-              size={40}
-              color={colors.textTertiary}
-            />
-            <Text
-              variant="bodyMedium"
-              style={{ color: colors.textSecondary, marginTop: spacing.sm }}
-            >
-              Sin datos de egresos
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.categoryList}>
-            {categoryData.map((cat) => (
-              <CategoryRow
-                key={cat.category_id}
-                name={cat.category_name}
-                amount={cat.total_ars}
-                percentage={categoryTotal > 0 ? (cat.total_ars / categoryTotal) * 100 : 0}
-                color={cat.color ?? FINANCIAL_COLORS.expense}
-                icon={cat.icon}
-                surfaceColor={colors.surfaceVariant}
-                textColor={colors.text}
-                secondaryTextColor={colors.textSecondary}
-              />
-            ))}
-          </View>
-        )}
-      </Card>
-
-      {/* ── Acciones rapidas ────────────────────────────────────────────────── */}
-      {canCreateTransactions && (
-        <View style={styles.quickActions}>
+          {/* ── Accion principal: crear movimiento ───────────────────── */}
           <Button
             variant="primary"
+            size="lg"
             icon="plus-circle-outline"
             fullWidth
             onPress={() => router.push('/transactions/new')}
-            style={styles.quickActionButton}
+            style={{ marginBottom: spacing.md }}
           >
             Nuevo Movimiento
           </Button>
+
+          {/* ── Acceso a mis movimientos ─────────────────────────────── */}
           <Button
             variant="outline"
-            icon="tag-outline"
+            icon="swap-horizontal"
             fullWidth
-            onPress={() => router.push('/(tabs)/categories')}
-            style={styles.quickActionButton}
+            onPress={() => router.push('/(tabs)/transactions')}
+            style={{ marginBottom: spacing.sm }}
           >
-            Ver Rubros
+            Ver mis movimientos
           </Button>
-        </View>
+        </>
       )}
 
       {/* Padding inferior para scroll seguro */}
@@ -779,6 +831,20 @@ const styles = StyleSheet.create({
   categoryBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+
+  // Seccion informativa (no-admin)
+  infoSection: {
+    alignItems: 'center',
+    gap: spacing.smd,
+    paddingVertical: spacing.md,
+  },
+  infoIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Acciones rapidas

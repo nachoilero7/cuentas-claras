@@ -10,6 +10,7 @@ import { Text, Chip, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useTransactions } from '@/src/features/transactions/hooks/useTransactions';
@@ -58,19 +59,30 @@ const FILTER_CHIPS: FilterChip[] = [
 // ── Componente ──────────────────────────────────────────────────────────────
 
 export default function TransactionsScreen() {
+  const { user } = useAuth();
   const { colors } = useAppTheme();
   const { data: profile } = useProfile();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
+  const role = profile?.role ?? 'viewer';
+  const isAdmin = role === 'admin';
+
+  // Non-admin users only see their own transactions
   const filters = useMemo(() => {
-    if (activeFilter === 'all') return undefined;
-    return { type: activeFilter as TransactionType };
-  }, [activeFilter]);
+    const f: Record<string, any> = {};
+    if (activeFilter !== 'all') {
+      f.type = activeFilter as TransactionType;
+    }
+    if (!isAdmin && user?.id) {
+      f.createdBy = user.id;
+    }
+    return Object.keys(f).length > 0 ? f : undefined;
+  }, [activeFilter, isAdmin, user?.id]);
 
   const { data: transactions, isLoading, error, refetch } = useTransactions(filters);
 
-  const role = profile?.role ?? 'viewer';
-  const canCreate = role === 'admin' || role === 'manager';
+  // All authenticated users can create transactions
+  const canCreate = true;
 
   const handleRefresh = useCallback(() => {
     refetch();
@@ -331,7 +343,7 @@ function TransactionCard({ transaction, colors, onPress }: TransactionCardProps)
           </Text>
         </View>
 
-        {/* Monto */}
+        {/* Monto y estado */}
         <View style={styles.amountContainer}>
           <Text
             variant="titleSmall"
@@ -340,12 +352,28 @@ function TransactionCard({ transaction, colors, onPress }: TransactionCardProps)
           >
             {formattedAmount}
           </Text>
-          <Text
-            variant="labelSmall"
-            style={[styles.typeLabel, { color: typeColor + '99' }]}
-          >
-            {TRANSACTION_TYPE_LABELS[transaction.type]}
-          </Text>
+          {transaction.status === 'pending' ? (
+            <Text
+              variant="labelSmall"
+              style={{ color: '#f59e0b', fontWeight: '600', fontSize: 10 }}
+            >
+              Pendiente
+            </Text>
+          ) : transaction.status === 'rejected' ? (
+            <Text
+              variant="labelSmall"
+              style={{ color: '#ef4444', fontWeight: '600', fontSize: 10 }}
+            >
+              Rechazada
+            </Text>
+          ) : (
+            <Text
+              variant="labelSmall"
+              style={[styles.typeLabel, { color: typeColor + '99' }]}
+            >
+              {TRANSACTION_TYPE_LABELS[transaction.type]}
+            </Text>
+          )}
         </View>
 
         {/* Flecha de navegacion */}

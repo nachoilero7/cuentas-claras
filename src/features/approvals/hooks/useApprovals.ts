@@ -7,6 +7,7 @@ import {
   createApprovalRequest,
 } from '../services/approvalService';
 import type { ApprovalWithDetails } from '../services/approvalService';
+import { sendPushToUser } from '@/src/core/services/pushNotifications';
 
 const ONE_MINUTE = 1000 * 60;
 
@@ -48,11 +49,21 @@ export function useApproveRequest() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidar aprobaciones, transacciones y dashboard para refrescar datos
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+      // Notificar al creador de la transaccion que fue aprobada
+      if (data?.requested_by && data?.transaction) {
+        sendPushToUser(
+          data.requested_by,
+          'Transaccion aprobada',
+          `Tu transaccion "${data.transaction.description}" fue aprobada.`,
+          { type: 'approval_approved', transactionId: data.transaction_id },
+        );
+      }
     },
   });
 }
@@ -68,11 +79,21 @@ export function useRejectRequest() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidar aprobaciones, transacciones y dashboard para refrescar datos
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+      // Notificar al creador de la transaccion que fue rechazada
+      if (data?.requested_by && data?.transaction) {
+        sendPushToUser(
+          data.requested_by,
+          'Transaccion rechazada',
+          `Tu transaccion "${data.transaction.description}" fue rechazada.`,
+          { type: 'approval_rejected', transactionId: data.transaction_id },
+        );
+      }
     },
   });
 }

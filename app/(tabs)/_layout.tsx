@@ -4,6 +4,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { useProfile } from '@/src/features/auth/hooks/useProfile';
 
 // ── Tipos para los iconos de tabs ───────────────────────────────────────────
 
@@ -14,6 +15,7 @@ interface TabConfig {
   title: string;
   icon: TabIconName;
   iconFocused: TabIconName;
+  adminOnly?: boolean;
 }
 
 const TABS: TabConfig[] = [
@@ -34,12 +36,14 @@ const TABS: TabConfig[] = [
     title: 'Rubros',
     icon: 'tag-outline',
     iconFocused: 'tag',
+    adminOnly: true,
   },
   {
     name: 'reports',
     title: 'Reportes',
     icon: 'chart-bar',
     iconFocused: 'chart-bar',
+    adminOnly: true,
   },
   {
     name: 'settings',
@@ -54,6 +58,8 @@ const TABS: TabConfig[] = [
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const { colors } = useAppTheme();
+  const { data: profile } = useProfile();
+  const isAdmin = profile?.role === 'admin';
 
   // Mostrar un indicador de carga mientras se verifica la sesion
   if (isLoading) {
@@ -108,6 +114,8 @@ export default function TabsLayout() {
                 color={color}
               />
             ),
+            // Ocultar tabs de admin para usuarios no-admin
+            href: tab.adminOnly && !isAdmin ? null : undefined,
           }}
         />
       ))}
