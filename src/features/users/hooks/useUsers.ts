@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAllProfiles,
   updateUserRole,
+  updateUserStatus,
 } from '@/src/features/auth/services/profileService';
 import {
   getUserPermissions,
@@ -32,6 +33,24 @@ export function useUpdateUserRole() {
   return useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: UserRole }) => {
       const { data, error } = await updateUserRole(userId, role);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['profile', variables.userId] });
+    },
+  });
+}
+
+// ─── Activar/desactivar usuario ────────────────────────────────────────────
+
+export function useToggleUserStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      const { data, error } = await updateUserStatus(userId, isActive);
       if (error) throw error;
       return data;
     },

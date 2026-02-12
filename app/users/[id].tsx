@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Switch, ActivityIndicator } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, Switch as PaperSwitch } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -8,6 +8,7 @@ import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import {
   useUpdateUserRole,
+  useToggleUserStatus,
   useUserPermissions,
   useSavePermissions,
 } from '@/src/features/users/hooks/useUsers';
@@ -18,6 +19,7 @@ import { spacing } from '@/src/shared/theme';
 import { USER_ROLE_LABELS } from '@/src/core/config/constants';
 import { formatDate } from '@/src/core/utils/date';
 import type { UserRole } from '@/src/core/types/database';
+import { hapticWarning, hapticSuccess, hapticError } from '@/src/shared/lib/haptics';
 import type { UpsertPermissionData } from '@/src/features/users/services/userService';
 
 // ── Configuracion de roles ──────────────────────────────────────────────────
@@ -56,6 +58,7 @@ export default function UserDetailScreen() {
   const { data: categories = [], isLoading: isCategoriesLoading } = useCategories();
   const { data: permissions = [], isLoading: isPermissionsLoading } = useUserPermissions(id!);
   const updateRoleMutation = useUpdateUserRole();
+  const toggleStatusMutation = useToggleUserStatus();
   const savePermissionsMutation = useSavePermissions();
 
   // Estado local
@@ -163,6 +166,51 @@ export default function UserDetailScreen() {
     }
   }, [id, permissionsState, savePermissionsMutation]);
 
+  // ── Handler: activar/desactivar usuario ────────────────────────────────────
+
+  const isSelf = currentProfile?.id === id;
+
+  const handleToggleStatus = useCallback(() => {
+    if (!id || !targetUser) return;
+
+    if (isSelf) {
+      hapticError();
+      Alert.alert('Accion no permitida', 'No puedes desactivar tu propia cuenta.');
+      return;
+    }
+
+    const newStatus = !targetUser.is_active;
+    const actionLabel = newStatus ? 'Activar' : 'Desactivar';
+    const userName = targetUser.display_name ?? targetUser.full_name ?? 'este usuario';
+
+    hapticWarning();
+    Alert.alert(
+      `${actionLabel} usuario`,
+      `¿${actionLabel} a ${userName}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: actionLabel,
+          style: newStatus ? 'default' : 'destructive',
+          onPress: async () => {
+            try {
+              await toggleStatusMutation.mutateAsync({ userId: id, isActive: newStatus });
+              hapticSuccess();
+              Alert.alert(
+                'Estado actualizado',
+                `El usuario fue ${newStatus ? 'activado' : 'desactivado'} correctamente.`,
+              );
+            } catch (err) {
+              hapticError();
+              const message = err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
+              Alert.alert('Error', message);
+            }
+          },
+        },
+      ],
+    );
+  }, [id, targetUser, isSelf, toggleStatusMutation]);
+
   // ── Guard: solo admin ─────────────────────────────────────────────────────
 
   if (!isAdmin) {
@@ -256,21 +304,37 @@ export default function UserDetailScreen() {
             {targetUser.email}
           </Text>
 
-          {/* Estado activo */}
-          <View style={styles.statusRow}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: targetUser.is_active ? colors.success : colors.textTertiary },
-              ]}
+          {/* Estado activo con toggle */}
+          <View style={styles.statusToggleContainer}>
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: targetUser.is_active ? colors.success : colors.textTertiary },
+                ]}
+              />
+              <Text
+                variant="bodySmall"
+                style={{ color: targetUser.is_active ? colors.success : colors.textTertiary }}
+              >
+                {targetUser.is_active ? 'Activo' : 'Inactivo'}
+              </Text>
+            </View>
+            <PaperSwitch
+              value={targetUser.is_active}
+              onValueChange={handleToggleStatus}
+              disabled={toggleStatusMutation.isPending || isSelf}
+              color={colors.success}
             />
-            <Text
-              variant="bodySmall"
-              style={{ color: targetUser.is_active ? colors.success : colors.textTertiary }}
-            >
-              {targetUser.is_active ? 'Activo' : 'Inactivo'}
-            </Text>
           </View>
+          {isSelf && (
+            <Text
+              variant="labelSmall"
+              style={{ color: colors.textTertiary, marginTop: spacing.xxs }}
+            >
+              No puedes cambiar tu propio estado
+            </Text>
+          )}
 
           {/* Miembro desde */}
           <Text
@@ -523,11 +587,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: spacing.xxs,
   },
+  statusToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.smd,
+    marginTop: spacing.sm,
+  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.sm,
   },
   statusDot: {
     width: 10,

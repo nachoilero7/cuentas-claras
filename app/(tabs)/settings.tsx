@@ -1,14 +1,17 @@
 export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
 
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Pressable, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Pressable, TextInput, Image } from 'react-native';
 import { Text, Divider, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme, type ThemeMode } from '@/src/core/providers/ThemeProvider';
 import { useProfile, useUpdateProfile } from '@/src/features/auth/hooks/useProfile';
+import { uploadAvatar } from '@/src/features/auth/services/profileService';
 import { useBiometric, BIOMETRIC_LABELS } from '@/src/features/security';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing } from '@/src/shared/theme';
@@ -20,10 +23,12 @@ export default function SettingsScreen() {
   const { colors, themeMode, setThemeMode } = useAppTheme();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const queryClient = useQueryClient();
   const biometric = useBiometric();
   const [loggingOut, setLoggingOut] = useState(false);
   const [editingAlias, setEditingAlias] = useState(false);
   const [aliasValue, setAliasValue] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Usar datos del perfil de DB, con fallback a metadata de auth
   const displayName =
@@ -36,6 +41,71 @@ export default function SettingsScreen() {
   const displayEmail = profile?.email ?? user?.email ?? 'Sin correo';
   const role: UserRole = profile?.role ?? 'viewer';
   const roleLabel = USER_ROLE_LABELS[role] ?? role;
+
+  // ── Manejo de avatar ──────────────────────────────────────────────────────
+
+  const handlePickAvatar = useCallback(() => {
+    Alert.alert('Cambiar foto de perfil', 'Selecciona una opcion', [
+      {
+        text: 'Camara',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permiso requerido', 'Se necesita acceso a la camara para tomar una foto.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+            allowsEditing: true,
+            aspect: [1, 1],
+          });
+          if (!result.canceled && result.assets?.length) {
+            await handleUploadAvatar(result.assets[0].uri);
+          }
+        },
+      },
+      {
+        text: 'Galeria',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permiso requerido', 'Se necesita acceso a la galeria para seleccionar una foto.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+            allowsEditing: true,
+            aspect: [1, 1],
+          });
+          if (!result.canceled && result.assets?.length) {
+            await handleUploadAvatar(result.assets[0].uri);
+          }
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }, [user?.id]);
+
+  const handleUploadAvatar = useCallback(async (imageUri: string) => {
+    if (!user?.id) return;
+
+    setUploadingAvatar(true);
+    try {
+      const { url, error } = await uploadAvatar(user.id, imageUri);
+      if (error) {
+        Alert.alert('Error', 'No se pudo subir la foto de perfil. Intenta nuevamente.');
+        return;
+      }
+      // Invalidar la query del perfil para refrescar los datos
+      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+    } catch {
+      Alert.alert('Error', 'Ocurrio un error inesperado al subir la foto.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }, [user?.id, queryClient]);
 
   const handleSignOut = useCallback(async () => {
     Alert.alert(
@@ -83,12 +153,38 @@ export default function SettingsScreen() {
     >
       {/* ── Tarjeta de perfil ──────────────────────────────────────────── */}
       <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-        <View style={[styles.avatar, { backgroundColor: colors.primaryContainer }]}>
-          <MaterialCommunityIcons
-            name="account"
-            size={40}
-            color={colors.primary}
-          />
+        <View style={styles.avatarContainer}>
+          {profile?.avatar_url ? (
+            <Image
+              source={{ uri: profile.avatar_url }}
+              style={[styles.avatar, styles.avatarImage]}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.primaryContainer }]}>
+              <MaterialCommunityIcons
+                name="account"
+                size={40}
+                color={colors.primary}
+              />
+            </View>
+          )}
+
+          {/* Badge de camara para cambiar avatar */}
+          <Pressable
+            style={[styles.cameraBadge, { backgroundColor: colors.primary }]}
+            onPress={handlePickAvatar}
+            disabled={uploadingAvatar}
+          >
+            {uploadingAvatar ? (
+              <ActivityIndicator size={14} color={colors.onPrimary} />
+            ) : (
+              <MaterialCommunityIcons
+                name="camera"
+                size={14}
+                color={colors.onPrimary}
+              />
+            )}
+          </Pressable>
         </View>
 
         {profileLoading ? (
@@ -571,13 +667,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: spacing.smd,
+  },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.smd,
+  },
+  avatarImage: {
+    resizeMode: 'cover',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   name: {
     fontWeight: '700',

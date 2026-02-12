@@ -11,6 +11,7 @@ import { Text } from 'react-native-paper';
 import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { supabase } from '@/src/core/config/supabase';
@@ -34,9 +35,10 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
+      const redirectUrl = Linking.createURL('/(auth)/login');
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
-        { redirectTo: undefined },
+        { redirectTo: redirectUrl },
       );
       if (error) {
         Alert.alert(
