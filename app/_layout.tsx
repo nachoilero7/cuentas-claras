@@ -13,6 +13,7 @@ import { ThemeProvider } from '@/src/core/providers/ThemeProvider';
 import { AuthProvider } from '@/src/core/providers/AuthProvider';
 import { OfflineBanner } from '@/src/shared/components/feedback/OfflineBanner';
 import { OfflineQueueIndicator } from '@/src/shared/components/feedback/OfflineQueueIndicator';
+import { SnackbarHost } from '@/src/shared/components/feedback/SnackbarHost';
 import { queryClient } from '@/src/core/config/queryClient';
 import { restoreQueryCache, persistQueryCache } from '@/src/sync/queryPersister';
 import { startSyncListener } from '@/src/sync/SyncManager';
@@ -85,6 +86,7 @@ export default function RootLayout() {
             <OfflineBanner />
             <OfflineQueueIndicator />
             <Slot />
+            <SnackbarHost />
           </View>
         </AuthProvider>
       </ThemeProvider>

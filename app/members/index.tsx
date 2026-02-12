@@ -8,7 +8,7 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { Text, ActivityIndicator, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack } from 'expo-router';
@@ -201,22 +201,41 @@ function MemberCard({ member, colors }: MemberCardProps) {
 
 // ── Pantalla principal ───────────────────────────────────────────────────────
 
+type RoleFilter = 'all' | UserRole;
+
+const ROLE_FILTER_CHIPS: { key: RoleFilter; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'admin', label: 'Admins' },
+  { key: 'manager', label: 'Managers' },
+  { key: 'viewer', label: 'Viewers' },
+];
+
 export default function MembersDirectoryScreen() {
   const { colors } = useAppTheme();
   const { data: users, isLoading, refetch, isRefetching } = useAllUsers();
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
 
   const filteredUsers = useMemo(() => {
     if (!users) return [];
-    if (!search.trim()) return users;
-    const query = search.toLowerCase().trim();
-    return users.filter(
-      (u) =>
-        u.full_name?.toLowerCase().includes(query) ||
-        u.email?.toLowerCase().includes(query) ||
-        u.display_name?.toLowerCase().includes(query)
-    );
-  }, [users, search]);
+    let result = users;
+
+    if (roleFilter !== 'all') {
+      result = result.filter((u) => u.role === roleFilter);
+    }
+
+    if (search.trim()) {
+      const query = search.toLowerCase().trim();
+      result = result.filter(
+        (u) =>
+          u.full_name?.toLowerCase().includes(query) ||
+          u.email?.toLowerCase().includes(query) ||
+          u.display_name?.toLowerCase().includes(query)
+      );
+    }
+
+    return result;
+  }, [users, search, roleFilter]);
 
   const handleRefresh = useCallback(() => {
     refetch();
@@ -294,9 +313,40 @@ export default function MembersDirectoryScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Filtros por rol */}
+        <View style={styles.roleChipsRow}>
+          {ROLE_FILTER_CHIPS.map((chip) => {
+            const isActive = roleFilter === chip.key;
+            return (
+              <Chip
+                key={chip.key}
+                mode={isActive ? 'flat' : 'outlined'}
+                selected={isActive}
+                onPress={() => setRoleFilter(chip.key)}
+                style={[
+                  styles.roleChip,
+                  isActive
+                    ? { backgroundColor: colors.primary }
+                    : { backgroundColor: colors.surface, borderColor: colors.outline },
+                ]}
+                textStyle={{
+                  color: isActive ? colors.onPrimary : colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: '500',
+                }}
+                showSelectedOverlay={false}
+                showSelectedCheck={false}
+                compact
+              >
+                {chip.label}
+              </Chip>
+            );
+          })}
+        </View>
       </View>
     ),
-    [colors, users?.length, search]
+    [colors, users?.length, search, roleFilter]
   );
 
   const ListEmpty = useMemo(() => {
@@ -339,13 +389,13 @@ export default function MembersDirectoryScreen() {
             textAlign: 'center',
           }}
         >
-          {search.trim()
-            ? 'Intenta con otro termino de busqueda.'
+          {search.trim() || roleFilter !== 'all'
+            ? 'Intenta con otros filtros de busqueda.'
             : 'Aun no hay miembros registrados.'}
         </Text>
       </View>
     );
-  }, [isLoading, colors, search]);
+  }, [isLoading, colors, search, roleFilter]);
 
   return (
     <>
@@ -393,6 +443,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     marginBottom: spacing.md,
+    gap: spacing.smd,
   },
   titleRow: {
     flexDirection: 'row',
@@ -473,6 +524,14 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
     borderRadius: borderRadius.sm,
     marginLeft: spacing.xs,
+  },
+  roleChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  roleChip: {
+    borderRadius: 20,
   },
   emptyContainer: {
     flex: 1,

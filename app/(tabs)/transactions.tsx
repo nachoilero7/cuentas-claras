@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import {
   View,
   StyleSheet,
@@ -174,6 +174,21 @@ export default function TransactionsScreen() {
     router.push(`/transactions/${id}`);
   }, []);
 
+  const renderTransaction = useCallback(
+    ({ item }: { item: TransactionWithCategory }) => (
+      <TransactionCard
+        transaction={item}
+        colors={colors}
+        onPress={() => handleNavigateToDetail(item.id)}
+      />
+    ),
+    [colors, handleNavigateToDetail],
+  );
+
+  const keyExtractor = useCallback((item: TransactionWithCategory) => item.id, []);
+
+  const ItemSeparator = useCallback(() => <View style={styles.separator} />, []);
+
   // ── Estado de carga ─────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -272,9 +287,14 @@ export default function TransactionsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        renderItem={renderTransaction}
+        ItemSeparatorComponent={ItemSeparator}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        windowSize={7}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListHeaderComponent={
           <View style={styles.filtersWrapper}>
             {/* Barra de busqueda */}
@@ -344,14 +364,6 @@ export default function TransactionsScreen() {
             tintColor={colors.primary}
           />
         }
-        renderItem={({ item }) => (
-          <TransactionCard
-            transaction={item}
-            colors={colors}
-            onPress={() => handleNavigateToDetail(item.id)}
-          />
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
       {canCreate && (
@@ -457,7 +469,7 @@ interface TransactionCardProps {
   onPress: () => void;
 }
 
-function TransactionCard({ transaction, colors, onPress }: TransactionCardProps) {
+const TransactionCard = memo(function TransactionCard({ transaction, colors, onPress }: TransactionCardProps) {
   const typeColor = FINANCIAL_COLORS[transaction.type];
   const typeIcon = TYPE_ICONS[transaction.type];
   const categoryColor = transaction.category?.color ?? colors.textTertiary;
@@ -582,7 +594,7 @@ function TransactionCard({ transaction, colors, onPress }: TransactionCardProps)
       </View>
     </Card>
   );
-}
+});
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 

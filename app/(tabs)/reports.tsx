@@ -250,8 +250,13 @@ export default function ReportsScreen() {
         payment_method: t.payment_method ?? null,
       }));
 
+      if (!summary) {
+        Alert.alert('Sin resumen', 'Espera a que se cargue el resumen antes de exportar.');
+        return;
+      }
+
       await exportReportToPdf({
-        summary: summary!,
+        summary,
         categoryReport: categoryReport ?? [],
         transactions: exportData,
         filters: {
