@@ -1,7 +1,7 @@
 // ─── Informacion de la aplicacion ────────────────────────────────────────────
 
 export const APP_NAME = 'Cuentas Claras';
-export const APP_VERSION = '0.2.0-beta';
+export const APP_VERSION = '0.3.0-rc';
 
 // ─── Monedas soportadas ─────────────────────────────────────────────────────
 
