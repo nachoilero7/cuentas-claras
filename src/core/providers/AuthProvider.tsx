@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import type { Session, User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/src/core/config/supabase';
+import { signInWithGoogle as googleSignIn } from '@/src/core/services/googleAuth';
 
 // ─── Tipos del contexto ─────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ interface AuthActions {
     password: string,
     fullName: string
   ) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
 }
@@ -118,6 +120,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     []
   );
 
+  const signInWithGoogle = useCallback(async (): Promise<{ error: Error | null }> => {
+    try {
+      const { error } = await googleSignIn();
+      return { error };
+    } catch (error) {
+      console.error('[Auth] Error inesperado en signInWithGoogle:', error);
+      return { error: error instanceof Error ? error : new Error('Error inesperado') };
+    }
+  }, []);
+
   const signOut = useCallback(async (): Promise<{ error: AuthError | null }> => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -151,10 +163,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isAuthenticated,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
       resetPassword,
     }),
-    [session, user, isLoading, isAuthenticated, signIn, signUp, signOut, resetPassword]
+    [session, user, isLoading, isAuthenticated, signIn, signUp, signInWithGoogle, signOut, resetPassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
