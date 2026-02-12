@@ -129,3 +129,82 @@ export function calculateNextExecution(current: string, frequency: RecurrenceFre
 
   return format(next, 'yyyy-MM-dd');
 }
+
+// ─── Ejecutar transacciones recurrentes vencidas ───────────────────────────
+
+export async function executeOverdueRecurring(): Promise<{
+  executed: number;
+  errors: string[];
+}> {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const errors: string[] = [];
+  let executed = 0;
+
+  // Obtener recurrentes activas con next_execution <= hoy
+  const { data: overdue, error: fetchError } = await supabase
+    .from('recurring_transactions')
+    .select('*')
+    .eq('is_active', true)
+    .lte('next_execution', today);
+
+  if (fetchError || !overdue || overdue.length === 0) {
+    return { executed: 0, errors: fetchError ? [fetchError.message] : [] };
+  }
+
+  // Obtener usuario actual
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { executed: 0, errors: ['Usuario no autenticado'] };
+  }
+
+  for (const rec of overdue as RecurringTransaction[]) {
+    try {
+      // Crear la transaccion correspondiente
+      const { error: insertError } = await supabase
+        .from('transactions')
+        .insert({
+          type: rec.type,
+          amount: rec.amount,
+          currency: rec.currency,
+          description: rec.description,
+          notes: rec.notes,
+          payment_method: rec.payment_method,
+          category_id: rec.category_id,
+          transfer_to_category_id: rec.transfer_to_category_id,
+          transaction_date: rec.next_execution,
+          created_by: user.id,
+          status: 'pending',
+          season_id: null,
+        });
+
+      if (insertError) {
+        errors.push(`${rec.description}: ${insertError.message}`);
+        continue;
+      }
+
+      // Calcular proxima ejecucion y actualizar
+      const nextExecution = calculateNextExecution(rec.next_execution, rec.frequency);
+      const { error: updateError } = await supabase
+        .from('recurring_transactions')
+        .update({
+          next_execution: nextExecution,
+          last_executed_at: new Date().toISOString(),
+        })
+        .eq('id', rec.id);
+
+      if (updateError) {
+        errors.push(`Actualizar ${rec.description}: ${updateError.message}`);
+      }
+
+      executed++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      errors.push(`${rec.description}: ${msg}`);
+    }
+  }
+
+  return { executed, errors };
+}

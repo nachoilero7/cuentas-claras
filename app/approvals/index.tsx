@@ -27,6 +27,7 @@ import { EmptyState } from '@/src/shared/components/feedback/EmptyState';
 import { AttachmentGallery } from '@/src/features/attachments/components';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { formatDate } from '@/src/core/utils/date';
+import { hapticSuccess, hapticError, hapticWarning } from '@/src/shared/lib/haptics';
 import { spacing, borderRadius } from '@/src/shared/theme';
 import type { ApprovalWithDetails } from '@/src/features/approvals/services/approvalService';
 import type { CurrencyCode } from '@/src/core/types/database';
@@ -89,6 +90,7 @@ export default function ApprovalsListScreen() {
       const authenticated = await authenticate('Confirma tu identidad para aprobar la transaccion');
       if (!authenticated) return;
 
+      hapticWarning();
       Alert.alert(
         'Confirmar aprobacion',
         'Esta seguro de que desea aprobar esta transaccion?',
@@ -101,9 +103,11 @@ export default function ApprovalsListScreen() {
                 { id: approvalId },
                 {
                   onSuccess: () => {
+                    hapticSuccess();
                     Alert.alert('Exito', 'Transaccion aprobada');
                   },
                   onError: (err) => {
+                    hapticError();
                     Alert.alert(
                       'Error',
                       err instanceof Error ? err.message : 'No se pudo aprobar la transaccion.',
@@ -144,11 +148,13 @@ export default function ApprovalsListScreen() {
       { id: rejectingId, comment },
       {
         onSuccess: () => {
+          hapticSuccess();
           setRejectModalVisible(false);
           setRejectingId(null);
           Alert.alert('Listo', 'Transaccion rechazada');
         },
         onError: (err) => {
+          hapticError();
           Alert.alert(
             'Error',
             err instanceof Error ? err.message : 'No se pudo rechazar la transaccion.',
@@ -434,7 +440,7 @@ export default function ApprovalsListScreen() {
     if (reviewedApprovals.length === 0) return null;
 
     return (
-      <View style={styles.reviewedSection}>
+      <View style={[styles.reviewedSection, { borderTopColor: colors.outlineVariant }]}>
         <View style={styles.sectionHeader}>
           <MaterialCommunityIcons
             name="history"
@@ -615,7 +621,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
   },
   reviewedCardContent: {
     flexDirection: 'row',

@@ -8,6 +8,11 @@ import type {
   PaymentMethod,
 } from '@/src/core/types/database';
 
+/** Escape special ILIKE characters to prevent pattern injection */
+function escapeIlike(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
+
 // ─── Tipos para transacciones con datos de categoria ────────────────────────
 
 export interface TransactionWithCategory extends Transaction {
@@ -89,7 +94,9 @@ export async function getTransactions(filters?: TransactionFilters) {
 
   // Busqueda por descripcion o notas
   if (filters?.search) {
-    query = query.or(`description.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`);
+    const trimmed = filters.search.slice(0, 100);
+    const escaped = escapeIlike(trimmed);
+    query = query.or(`description.ilike.%${escaped}%,notes.ilike.%${escaped}%`);
   }
 
   // Paginacion

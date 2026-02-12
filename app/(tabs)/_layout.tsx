@@ -6,6 +6,8 @@ import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useUnreadCount } from '@/src/features/budget/hooks';
+import { useRecurringExecution } from '@/src/features/recurring/hooks/useRecurringExecution';
+import { useBudgetAlertDispatch } from '@/src/features/budget/hooks/useBudgetAlertDispatch';
 import type { UserRole } from '@/src/core/types/database';
 
 // ── Tipos para los iconos de tabs ───────────────────────────────────────────
@@ -73,6 +75,12 @@ export default function TabsLayout() {
   const { data: unreadCount } = useUnreadCount();
   const isAdmin = profile?.role === 'admin';
   const userRole = profile?.role;
+
+  // Ejecutar transacciones recurrentes vencidas al abrir la app
+  useRecurringExecution();
+
+  // Verificar alertas de presupuesto y crear notificaciones
+  useBudgetAlertDispatch();
 
   // Determinar si un tab debe estar visible segun el rol del usuario
   const isTabVisible = (tab: TabConfig): boolean => {

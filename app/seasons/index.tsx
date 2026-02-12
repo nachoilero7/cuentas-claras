@@ -177,11 +177,11 @@ export default function SeasonsListScreen() {
                   <MaterialCommunityIcons
                     name="star"
                     size={14}
-                    color="#92400e"
+                    color={colors.warning}
                   />
                   <Text
                     variant="labelSmall"
-                    style={styles.currentBadgeText}
+                    style={[styles.currentBadgeText, { color: colors.warning }]}
                   >
                     Actual
                   </Text>
@@ -327,7 +327,6 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   currentBadgeText: {
-    color: '#92400e',
     marginLeft: 4,
     fontWeight: '700',
   },

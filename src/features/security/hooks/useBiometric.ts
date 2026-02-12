@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const BIOMETRIC_ENABLED_KEY = '@cuentas_claras:biometric_enabled';
 
@@ -57,7 +57,7 @@ export function useBiometric(): UseBiometricReturn {
           LocalAuthentication.hasHardwareAsync(),
           LocalAuthentication.isEnrolledAsync(),
           LocalAuthentication.supportedAuthenticationTypesAsync(),
-          AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY),
+          SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY),
         ]);
 
         if (!mounted) return;
@@ -93,7 +93,7 @@ export function useBiometric(): UseBiometricReturn {
       if (!result.success) return;
     }
 
-    await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, enabled ? 'true' : 'false');
+    await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, enabled ? 'true' : 'false');
     setState((prev) => ({ ...prev, isEnabled: enabled }));
   }, []);
 

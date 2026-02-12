@@ -1,5 +1,7 @@
 import { supabase } from '@/src/core/config/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BudgetAlert } from '@/src/core/types/database';
+import { createBudgetAlertNotification } from './notificationService';
 
 // ─── Tipos extendidos para alertas con datos de categoria ───────────────────
 
@@ -183,4 +185,82 @@ export async function checkAllBudgets(): Promise<{ data: BudgetStatus[]; error: 
     .filter((s): s is BudgetStatus => s !== null);
 
   return { data: statuses, error: null };
+}
+
+const BUDGET_ALERT_LAST_CHECK_KEY = '@cuentas_claras:budget_alert_last_check';
+const MIN_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 horas entre chequeos
+
+// ─── Despachar notificaciones de alertas de presupuesto ─────────────────────
+
+export async function dispatchBudgetAlertNotifications(): Promise<{
+  notified: number;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let notified = 0;
+
+  try {
+    // Throttle: no chequear mas de una vez cada 4 horas
+    const lastCheck = await AsyncStorage.getItem(BUDGET_ALERT_LAST_CHECK_KEY);
+    if (lastCheck) {
+      const elapsed = Date.now() - parseInt(lastCheck, 10);
+      if (elapsed < MIN_CHECK_INTERVAL_MS) {
+        return { notified: 0, errors: [] };
+      }
+    }
+
+    // Verificar presupuestos
+    const { data: statuses, error: statusError } = await checkAllBudgets();
+    if (statusError) {
+      return { notified: 0, errors: [statusError.message] };
+    }
+
+    // Filtrar solo los que exceden el umbral
+    const overThreshold = statuses.filter((s) => s.is_over_threshold);
+    if (overThreshold.length === 0) {
+      await AsyncStorage.setItem(BUDGET_ALERT_LAST_CHECK_KEY, Date.now().toString());
+      return { notified: 0, errors: [] };
+    }
+
+    // Obtener usuarios admin y manager para notificar
+    const { data: targetUsers, error: usersError } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin', 'manager'])
+      .eq('is_active', true);
+
+    if (usersError || !targetUsers || targetUsers.length === 0) {
+      return { notified: 0, errors: usersError ? [usersError.message] : [] };
+    }
+
+    const targetUserIds = targetUsers.map((u) => u.id);
+
+    // Crear notificaciones para cada categoria sobre el umbral
+    for (const status of overThreshold) {
+      try {
+        const { error: notifError } = await createBudgetAlertNotification(
+          status.category_name,
+          status.percentage_used,
+          targetUserIds,
+        );
+
+        if (notifError) {
+          errors.push(`${status.category_name}: ${notifError.message}`);
+        } else {
+          notified++;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error desconocido';
+        errors.push(`${status.category_name}: ${msg}`);
+      }
+    }
+
+    // Guardar timestamp del ultimo chequeo
+    await AsyncStorage.setItem(BUDGET_ALERT_LAST_CHECK_KEY, Date.now().toString());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error general';
+    errors.push(msg);
+  }
+
+  return { notified, errors };
 }

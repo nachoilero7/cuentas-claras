@@ -24,6 +24,7 @@ import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
 import { EmptyState } from '@/src/shared/components/feedback/EmptyState';
 import { formatCurrency } from '@/src/core/utils/currency';
+import { hapticWarning } from '@/src/shared/lib/haptics';
 import { spacing, borderRadius } from '@/src/shared/theme';
 import type { BudgetAlertWithCategory } from '@/src/features/budget/services/budgetAlertService';
 import type { BudgetStatus } from '@/src/features/budget/services/budgetAlertService';
@@ -43,11 +44,13 @@ function ProgressBar({
   threshold,
   color,
   trackColor,
+  markerColor,
 }: {
   percentage: number;
   threshold: number;
   color: string;
   trackColor: string;
+  markerColor: string;
 }) {
   const clampedPercentage = Math.min(percentage, 100);
   const clampedThreshold = Math.min(threshold, 100);
@@ -67,7 +70,7 @@ function ProgressBar({
       <View
         style={[
           progressStyles.thresholdMarker,
-          { left: `${clampedThreshold}%` },
+          { left: `${clampedThreshold}%`, backgroundColor: markerColor },
         ]}
       />
     </View>
@@ -90,7 +93,6 @@ const progressStyles = StyleSheet.create({
     top: -2,
     width: 2,
     height: 12,
-    backgroundColor: '#374151',
     borderRadius: 1,
     marginLeft: -1,
   },
@@ -229,6 +231,7 @@ export default function BudgetAlertsScreen() {
   };
 
   const handleDeleteAlert = (alert: BudgetAlertWithCategory) => {
+    hapticWarning();
     Alert.alert(
       'Eliminar alerta',
       `Deseas eliminar la alerta de "${alert.category?.name ?? 'esta categoria'}"?`,
@@ -311,6 +314,7 @@ export default function BudgetAlertsScreen() {
             threshold={status.threshold_percentage}
             color={progressColor}
             trackColor={colors.outlineVariant}
+            markerColor={colors.text}
           />
         </View>
 
@@ -375,7 +379,7 @@ export default function BudgetAlertsScreen() {
         </View>
 
         {/* Control de umbral con stepper */}
-        <View style={styles.thresholdSection}>
+        <View style={[styles.thresholdSection, { borderTopColor: colors.outlineVariant }]}>
           <Text
             variant="bodySmall"
             style={{ color: colors.textSecondary, marginBottom: spacing.sm }}
@@ -428,7 +432,7 @@ export default function BudgetAlertsScreen() {
 
         {/* Boton de eliminar */}
         <Pressable
-          style={styles.deleteRow}
+          style={[styles.deleteRow, { borderTopColor: colors.outlineVariant }]}
           onPress={() => handleDeleteAlert(item)}
         >
           <MaterialCommunityIcons
@@ -609,7 +613,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.smd,
     paddingTop: spacing.smd,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e5e5e5',
   },
   stepperRow: {
     flexDirection: 'row',
@@ -644,6 +647,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.smd,
     paddingTop: spacing.smd,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e5e5e5',
   },
 });

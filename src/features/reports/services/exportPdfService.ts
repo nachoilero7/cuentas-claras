@@ -648,4 +648,7 @@ export async function exportReportToPdf(data: PdfReportData): Promise<void> {
     mimeType: 'application/pdf',
     dialogTitle: 'Compartir reporte financiero',
   });
+
+  // Limpiar archivo temporal despues de compartir
+  FileSystem.deleteAsync(destPath, { idempotent: true }).catch(() => {});
 }

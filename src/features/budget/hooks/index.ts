@@ -11,3 +11,5 @@ export {
   useMarkAsRead,
   useMarkAllAsRead,
 } from './useNotifications';
+
+export { useBudgetAlertDispatch } from './useBudgetAlertDispatch';

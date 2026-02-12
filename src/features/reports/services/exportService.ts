@@ -88,6 +88,9 @@ async function saveAndShareWorkbook(
     mimeType:
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
+
+  // Limpiar archivo temporal despues de compartir
+  FileSystem.deleteAsync(filePath, { idempotent: true }).catch(() => {});
 }
 
 // ── Construir hoja de movimientos ───────────────────────────────────────────
