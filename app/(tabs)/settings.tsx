@@ -253,8 +253,59 @@ export default function SettingsScreen() {
               color={colors.textTertiary}
             />
           </Pressable>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant }} />
+          <Pressable
+            style={styles.infoRow}
+            onPress={() => router.push('/budget-alerts')}
+          >
+            <MaterialCommunityIcons
+              name="alert-decagram-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <View style={styles.infoContent}>
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                Alertas de presupuesto
+              </Text>
+              <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                Configurar alertas por categoria
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={colors.textTertiary}
+            />
+          </Pressable>
         </View>
       )}
+
+      {/* ── Notificaciones (todos los usuarios) ──────────────────────── */}
+      <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+        <Pressable
+          style={styles.infoRow}
+          onPress={() => router.push('/notifications')}
+        >
+          <MaterialCommunityIcons
+            name="bell-outline"
+            size={20}
+            color={colors.primary}
+          />
+          <View style={styles.infoContent}>
+            <Text variant="bodyMedium" style={{ color: colors.text }}>
+              Notificaciones
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Ver alertas y actualizaciones
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={colors.textTertiary}
+          />
+        </Pressable>
+      </View>
 
       {/* ── Boton de cerrar sesion ────────────────────────────────────── */}
       <View style={styles.logoutSection}>
