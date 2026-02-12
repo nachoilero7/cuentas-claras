@@ -6,6 +6,8 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Link, router } from 'expo-router';
@@ -53,7 +55,7 @@ interface FormErrors {
 // ── Componente ──────────────────────────────────────────────────────────────
 
 export default function RegisterScreen() {
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const { colors } = useAppTheme();
 
   const [fullName, setFullName] = useState('');
@@ -62,6 +64,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
 
   const validate = useCallback((): boolean => {
@@ -119,6 +122,23 @@ export default function RegisterScreen() {
       setLoading(false);
     }
   }, [validate, email, password, fullName, signUp]);
+
+  const handleGoogleSignUp = useCallback(async () => {
+    setGoogleLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        Alert.alert(
+          'Error con Google',
+          error.message ?? 'No se pudo registrar con Google.',
+        );
+      }
+    } catch {
+      Alert.alert('Error', 'No se pudo conectar con Google. Intenta mas tarde.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [signInWithGoogle]);
 
   const clearError = useCallback((field: keyof FormErrors) => {
     setErrors((prev) => {
@@ -208,6 +228,37 @@ export default function RegisterScreen() {
                   Crear Cuenta
                 </Text>
 
+                {/* ── Boton de Google ────────────────────────────────── */}
+                <Pressable
+                  style={[styles.googleButton, { borderColor: colors.outline }]}
+                  onPress={handleGoogleSignUp}
+                  disabled={googleLoading || loading}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator size={20} color={colors.text} />
+                  ) : (
+                    <MaterialCommunityIcons name="google" size={20} color="#4285F4" />
+                  )}
+                  <Text
+                    variant="labelLarge"
+                    style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '600' }}
+                  >
+                    Registrarse con Google
+                  </Text>
+                </Pressable>
+
+                {/* ── Separador ──────────────────────────────────────── */}
+                <View style={styles.dividerRow}>
+                  <View style={[styles.dividerLine, { backgroundColor: colors.outlineVariant }]} />
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: colors.textTertiary, marginHorizontal: spacing.smd }}
+                  >
+                    o
+                  </Text>
+                  <View style={[styles.dividerLine, { backgroundColor: colors.outlineVariant }]} />
+                </View>
+
                 <Input
                   label="Nombre completo"
                   value={fullName}
@@ -279,7 +330,7 @@ export default function RegisterScreen() {
                   size="lg"
                   fullWidth
                   loading={loading}
-                  disabled={loading}
+                  disabled={loading || googleLoading}
                   onPress={handleRegister}
                   icon="account-plus"
                   testID="register-button"
@@ -345,6 +396,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: spacing.sm,
     textAlign: 'center',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
   },
   link: {
     textAlign: 'center',
