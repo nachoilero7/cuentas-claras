@@ -8,8 +8,9 @@ import {
   Alert,
 } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { z } from 'zod';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
@@ -42,8 +43,6 @@ const registerSchema = z
     path: ['confirmPassword'],
   });
 
-// ── Tipos de errores de formulario ──────────────────────────────────────────
-
 interface FormErrors {
   fullName?: string;
   email?: string;
@@ -63,6 +62,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   const validate = useCallback((): boolean => {
     const result = registerSchema.safeParse({
@@ -93,7 +93,11 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const { error } = await signUp(email.trim(), password, fullName.trim());
+      const { error, needsConfirmation } = await signUp(
+        email.trim(),
+        password,
+        fullName.trim(),
+      );
       if (error) {
         const messages: Record<string, string> = {
           'User already registered': 'Ya existe una cuenta con este correo electronico.',
@@ -104,9 +108,11 @@ export default function RegisterScreen() {
           'Error al crear cuenta',
           messages[error.message] ?? error.message ?? 'Ocurrio un error inesperado.',
         );
+      } else if (needsConfirmation) {
+        setRegistered(true);
       }
-      // Si se creo exitosamente sin sesion, AuthProvider o el signUp
-      // ya muestran un alert de confirmacion de email.
+      // Si no necesita confirmacion, el onAuthStateChange del AuthProvider
+      // se encarga de redirigir automaticamente al inicio
     } catch {
       Alert.alert('Error', 'No se pudo conectar al servidor. Intenta mas tarde.');
     } finally {
@@ -114,7 +120,6 @@ export default function RegisterScreen() {
     }
   }, [validate, email, password, fullName, signUp]);
 
-  // Limpiar error de un campo individual cuando cambia
   const clearError = useCallback((field: keyof FormErrors) => {
     setErrors((prev) => {
       if (!prev[field]) return prev;
@@ -147,107 +152,151 @@ export default function RegisterScreen() {
               variant="bodyMedium"
               style={[styles.subtitle, { color: colors.textSecondary }]}
             >
-              Crea tu cuenta para comenzar
+              {registered ? 'Registro exitoso' : 'Crea tu cuenta para comenzar'}
             </Text>
           </View>
 
-          {/* ── Formulario ────────────────────────────────────────────── */}
+          {/* ── Contenido ─────────────────────────────────────────────── */}
           <View style={[styles.form, { backgroundColor: colors.surface }]}>
-            <Text
-              variant="headlineSmall"
-              style={[styles.formTitle, { color: colors.text }]}
-            >
-              Crear Cuenta
-            </Text>
+            {registered ? (
+              /* ── Estado de exito ───────────────────────────────────── */
+              <View style={styles.successContainer}>
+                <MaterialCommunityIcons
+                  name="email-check-outline"
+                  size={64}
+                  color={colors.primary}
+                />
+                <Text
+                  variant="headlineSmall"
+                  style={[styles.successTitle, { color: colors.text }]}
+                >
+                  Revisa tu correo
+                </Text>
+                <Text
+                  variant="bodyMedium"
+                  style={[styles.successMessage, { color: colors.textSecondary }]}
+                >
+                  Te enviamos un enlace de confirmacion a{' '}
+                  <Text style={{ fontWeight: '700', color: colors.text }}>
+                    {email}
+                  </Text>
+                  . Confirma tu correo para poder iniciar sesion.
+                </Text>
+                <Text
+                  variant="bodySmall"
+                  style={[styles.successHint, { color: colors.textTertiary }]}
+                >
+                  Si no lo ves, revisa tu carpeta de spam.
+                </Text>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onPress={() => router.replace('/(auth)/login')}
+                  icon="login"
+                >
+                  Ir a iniciar sesion
+                </Button>
+              </View>
+            ) : (
+              /* ── Formulario ─────────────────────────────────────────── */
+              <>
+                <Text
+                  variant="headlineSmall"
+                  style={[styles.formTitle, { color: colors.text }]}
+                >
+                  Crear Cuenta
+                </Text>
 
-            <Input
-              label="Nombre completo"
-              value={fullName}
-              onChangeText={(text) => {
-                setFullName(text);
-                clearError('fullName');
-              }}
-              placeholder="Juan Perez"
-              leftIcon="account-outline"
-              error={errors.fullName}
-              autoCapitalize="words"
-              autoComplete="name"
-              returnKeyType="next"
-              testID="register-name"
-            />
+                <Input
+                  label="Nombre completo"
+                  value={fullName}
+                  onChangeText={(text) => {
+                    setFullName(text);
+                    clearError('fullName');
+                  }}
+                  placeholder="Juan Perez"
+                  leftIcon="account-outline"
+                  error={errors.fullName}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  returnKeyType="next"
+                  testID="register-name"
+                />
 
-            <Input
-              label="Correo electronico"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                clearError('email');
-              }}
-              placeholder="tu@correo.com"
-              leftIcon="email-outline"
-              error={errors.email}
-              keyboardType="email-address"
-              autoComplete="email"
-              autoCapitalize="none"
-              returnKeyType="next"
-              testID="register-email"
-            />
+                <Input
+                  label="Correo electronico"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    clearError('email');
+                  }}
+                  placeholder="tu@correo.com"
+                  leftIcon="email-outline"
+                  error={errors.email}
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  returnKeyType="next"
+                  testID="register-email"
+                />
 
-            <Input
-              label="Contrasena"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                clearError('password');
-              }}
-              placeholder="Minimo 6 caracteres"
-              leftIcon="lock-outline"
-              error={errors.password}
-              secureTextEntry
-              autoComplete="new-password"
-              returnKeyType="next"
-              testID="register-password"
-            />
+                <Input
+                  label="Contrasena"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    clearError('password');
+                  }}
+                  placeholder="Minimo 6 caracteres"
+                  leftIcon="lock-outline"
+                  error={errors.password}
+                  secureTextEntry
+                  autoComplete="new-password"
+                  returnKeyType="next"
+                  testID="register-password"
+                />
 
-            <Input
-              label="Confirmar contrasena"
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                clearError('confirmPassword');
-              }}
-              placeholder="Repite tu contrasena"
-              leftIcon="lock-check-outline"
-              error={errors.confirmPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              returnKeyType="done"
-              onSubmitEditing={handleRegister}
-              testID="register-confirm-password"
-            />
+                <Input
+                  label="Confirmar contrasena"
+                  value={confirmPassword}
+                  onChangeText={(text) => {
+                    setConfirmPassword(text);
+                    clearError('confirmPassword');
+                  }}
+                  placeholder="Repite tu contrasena"
+                  leftIcon="lock-check-outline"
+                  error={errors.confirmPassword}
+                  secureTextEntry
+                  autoComplete="new-password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegister}
+                  testID="register-confirm-password"
+                />
 
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={loading}
-              disabled={loading}
-              onPress={handleRegister}
-              icon="account-plus"
-              testID="register-button"
-            >
-              Crear Cuenta
-            </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  loading={loading}
+                  disabled={loading}
+                  onPress={handleRegister}
+                  icon="account-plus"
+                  testID="register-button"
+                >
+                  Crear Cuenta
+                </Button>
 
-            {/* ── Enlace a login ──────────────────────────────────────── */}
-            <Link href="/(auth)/login" asChild>
-              <Text
-                variant="bodyMedium"
-                style={[styles.link, { color: colors.primary }]}
-              >
-                Ya tienes cuenta? Iniciar sesion
-              </Text>
-            </Link>
+                <Link href="/(auth)/login" asChild>
+                  <Text
+                    variant="bodyMedium"
+                    style={[styles.link, { color: colors.primary }]}
+                  >
+                    Ya tienes cuenta? Iniciar sesion
+                  </Text>
+                </Link>
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -301,5 +350,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
     fontWeight: '600',
+  },
+  successContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    gap: spacing.md,
+  },
+  successTitle: {
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  successMessage: {
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  successHint: {
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
 });
