@@ -15,6 +15,8 @@ import type {
 import { useOfflineAware } from '@/src/sync';
 import type { TransactionStatus } from '@/src/core/types/database';
 
+type OfflineMutationPayload = Record<string, string | number | boolean | null | undefined>;
+
 const ONE_MINUTE = 1000 * 60;
 
 // ─── Listar transacciones con filtros opcionales ────────────────────────────
@@ -57,7 +59,7 @@ export function useCreateTransaction() {
 
       const { result, queued } = await executeOrQueue(
         'create_transaction',
-        { ...data, status } as unknown as Record<string, unknown>,
+        { ...data, status } as unknown as OfflineMutationPayload,
         async () => {
           const { data: transaction, error } = await createTransaction(data, status);
           if (error) throw error;
@@ -86,7 +88,7 @@ export function useUpdateTransaction() {
     mutationFn: async ({ id, ...updates }: { id: string } & UpdateTransactionData) => {
       const { result, queued } = await executeOrQueue(
         'update_transaction',
-        { id, ...updates } as unknown as Record<string, unknown>,
+        { id, ...updates } as unknown as OfflineMutationPayload,
         async () => {
           const { data, error } = await updateTransaction(id, updates);
           if (error) throw error;
@@ -152,6 +154,7 @@ export function useDeleteTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
     },
   });
 }

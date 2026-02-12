@@ -182,7 +182,7 @@ function CategoryRow({
         <View style={styles.categoryNameRow}>
           {icon ? (
             <MaterialCommunityIcons
-              name={icon as any}
+              name={icon as keyof typeof MaterialCommunityIcons.glyphMap}
               size={18}
               color={barColor}
               style={{ marginRight: spacing.xs }}
@@ -255,8 +255,7 @@ export default function DashboardScreen() {
     profile?.display_name ??
     profile?.full_name ??
     user?.user_metadata?.full_name ??
-    user?.email?.split('@')[0] ??
-    'Usuario';
+    user?.email?.split('@')?.[0] ?? 'Usuario';
 
   // Rol del usuario
   const userRole = profile?.role ?? 'viewer';

@@ -3,14 +3,36 @@ import { QueryClient } from '@tanstack/react-query';
 import { getOfflineQueue, dequeueMutation, incrementRetryCount } from './offlineQueue';
 import { persistQueryCache } from './queryPersister';
 import { createTransaction, updateTransaction, deleteTransaction } from '@/src/features/transactions/services/transactionService';
-import { createCategory, updateCategory } from '@/src/features/categories/services/categoryService';
+import { createCategory, updateCategory, deleteCategory } from '@/src/features/categories/services/categoryService';
 import { createSeason, updateSeason, deleteSeason } from '@/src/features/seasons/services/seasonService';
 import { approveRequest, rejectRequest } from '@/src/features/approvals/services/approvalService';
 import { createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction } from '@/src/features/recurring/services';
 import { upsertBudgetAlert, deleteBudgetAlert } from '@/src/features/budget/services/budgetAlertService';
+import { showSnackbar } from '@/src/shared/lib/snackbar';
 import type { OfflineMutation } from './offlineQueue';
 
 const MAX_RETRIES = 3;
+
+// ── Descripciones legibles para cada tipo de mutacion ────────────────────────
+
+const MUTATION_DESCRIPTIONS: Record<OfflineMutation['type'], string> = {
+  create_transaction: 'crear movimiento',
+  update_transaction: 'actualizar movimiento',
+  delete_transaction: 'eliminar movimiento',
+  create_category: 'crear rubro',
+  update_category: 'actualizar rubro',
+  delete_category: 'eliminar rubro',
+  create_season: 'crear temporada',
+  update_season: 'actualizar temporada',
+  delete_season: 'eliminar temporada',
+  approve_request: 'aprobar solicitud',
+  reject_request: 'rechazar solicitud',
+  create_recurring: 'crear movimiento recurrente',
+  update_recurring: 'actualizar movimiento recurrente',
+  delete_recurring: 'eliminar movimiento recurrente',
+  upsert_budget_alert: 'guardar alerta de presupuesto',
+  delete_budget_alert: 'eliminar alerta de presupuesto',
+};
 
 // ── Mapeo de tipo de mutacion a query keys para invalidar ───────────────────
 
@@ -20,6 +42,7 @@ const MUTATION_QUERY_KEYS: Record<string, string[][]> = {
   delete_transaction: [['transactions'], ['reports'], ['category-balances']],
   create_category: [['categories']],
   update_category: [['categories'], ['category-balances']],
+  delete_category: [['categories'], ['transactions'], ['dashboard']],
   create_season: [['seasons']],
   update_season: [['seasons']],
   delete_season: [['seasons']],
@@ -57,6 +80,10 @@ async function processMutation(mutation: OfflineMutation): Promise<boolean> {
       case 'update_category': {
         const { id, ...updates } = mutation.payload as any;
         const { error } = await updateCategory(id, updates);
+        return !error;
+      }
+      case 'delete_category': {
+        const { error } = await deleteCategory(mutation.payload.id as string);
         return !error;
       }
       case 'create_season': {
@@ -133,6 +160,14 @@ export async function processOfflineQueue(queryClient: QueryClient): Promise<{ p
       if (__DEV__) console.warn(`[SyncManager] Mutacion ${mutation.id} excedio max reintentos, descartando`);
       await dequeueMutation(mutation.id);
       failed += 1;
+
+      // Notificar al usuario que la mutacion se perdio
+      const description = MUTATION_DESCRIPTIONS[mutation.type] ?? mutation.type;
+      showSnackbar(
+        `No se pudo sincronizar: ${description}. Los datos se perdieron.`,
+        'error',
+      );
+
       continue;
     }
 

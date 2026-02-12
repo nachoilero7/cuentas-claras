@@ -3,16 +3,13 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { lightColorScheme } from '@/src/shared/theme';
+import { TRANSACTION_TYPE_LABELS } from '@/src/core/config/constants';
 import type { ExportTransaction, ExportFilters } from './exportService';
 import type { CategoryReportItem, ReportSummary } from './reportService';
 
 // ── Mapas de etiquetas ──────────────────────────────────────────────────────
 
-const TYPE_LABELS: Record<string, string> = {
-  income: 'Ingreso',
-  expense: 'Egreso',
-  transfer: 'Transferencia',
-};
+const TYPE_LABELS: Record<string, string> = TRANSACTION_TYPE_LABELS;
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
@@ -269,7 +266,7 @@ function buildReportHtml(data: PdfReportData): string {
     const typeLabel = TYPE_LABELS[t.type] ?? t.type;
     const statusLabel = STATUS_LABELS[t.status] ?? t.status;
     const bgColor = i % 2 === 0 ? COLORS.white : COLORS.background;
-    const paymentLabel = (t as any).payment_method ? PAYMENT_METHOD_LABELS[(t as any).payment_method] ?? '' : '';
+    const paymentLabel = t.payment_method ? PAYMENT_METHOD_LABELS[t.payment_method] ?? '' : '';
 
     return `
       <tr style="background: ${bgColor};">

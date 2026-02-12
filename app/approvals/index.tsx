@@ -327,6 +327,7 @@ export default function ApprovalsListScreen() {
                 icon="check"
                 onPress={() => handleApprove(item.id)}
                 loading={approveMutation.isPending}
+                disabled={approveMutation.isPending || rejectMutation.isPending}
                 style={{ ...styles.approveButton, backgroundColor: colors.income, borderColor: colors.income }}
                 labelStyle={{ color: '#ffffff' }}
               >
@@ -338,6 +339,7 @@ export default function ApprovalsListScreen() {
                 icon="close"
                 onPress={() => openRejectModal(item.id)}
                 loading={rejectMutation.isPending}
+                disabled={approveMutation.isPending || rejectMutation.isPending}
                 style={{ ...styles.rejectButton, borderColor: colors.expense }}
                 labelStyle={{ color: colors.expense }}
               >

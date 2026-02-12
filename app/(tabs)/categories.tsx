@@ -1,12 +1,13 @@
 export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
 
-import { useCallback } from 'react';
+import { useCallback, memo } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -43,6 +44,8 @@ export default function CategoriesScreen() {
   const handleNavigateToEdit = useCallback((id: string) => {
     router.push(`/categories/${id}`);
   }, []);
+
+  const ItemSeparator = useCallback(() => <View style={styles.separator} />, []);
 
   // ── Estado de carga ───────────────────────────────────────────────────────
 
@@ -114,6 +117,10 @@ export default function CategoriesScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        windowSize={7}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -129,7 +136,7 @@ export default function CategoriesScreen() {
             onPress={() => handleNavigateToEdit(item.id)}
           />
         )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={ItemSeparator}
       />
 
       {canManage && (
@@ -153,7 +160,7 @@ interface CategoryCardProps {
   onPress: () => void;
 }
 
-function CategoryCard({ category, colors, onPress }: CategoryCardProps) {
+const CategoryCard = memo(function CategoryCard({ category, colors, onPress }: CategoryCardProps) {
   const iconName = (category.icon ?? 'tag') as keyof typeof MaterialCommunityIcons.glyphMap;
   const categoryColor = category.color ?? colors.primary;
 
@@ -238,7 +245,7 @@ function CategoryCard({ category, colors, onPress }: CategoryCardProps) {
       </View>
     </Card>
   );
-}
+});
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 

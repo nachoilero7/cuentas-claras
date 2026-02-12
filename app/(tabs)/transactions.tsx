@@ -13,6 +13,7 @@ import {
 import { Text, Chip, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { startOfWeek, startOfMonth, subMonths, format } from 'date-fns';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -74,29 +75,26 @@ function getDateRange(filter: DateFilter): { startDate?: string; endDate?: strin
   if (filter === 'all') return {};
 
   const now = new Date();
-  const endDate = now.toISOString().split('T')[0]; // hoy YYYY-MM-DD
+  const endDate = format(now, 'yyyy-MM-dd');
 
   if (filter === 'today') {
     return { startDate: endDate, endDate };
   }
 
   if (filter === 'week') {
-    const start = new Date(now);
-    const dayOfWeek = start.getDay();
     // Lunes como inicio de semana
-    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    start.setDate(start.getDate() - diff);
-    return { startDate: start.toISOString().split('T')[0], endDate };
+    const start = startOfWeek(now, { weekStartsOn: 1 });
+    return { startDate: format(start, 'yyyy-MM-dd'), endDate };
   }
 
   if (filter === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { startDate: start.toISOString().split('T')[0], endDate };
+    const start = startOfMonth(now);
+    return { startDate: format(start, 'yyyy-MM-dd'), endDate };
   }
 
   // quarter - ultimos 3 meses
-  const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-  return { startDate: start.toISOString().split('T')[0], endDate };
+  const start = startOfMonth(subMonths(now, 2));
+  return { startDate: format(start, 'yyyy-MM-dd'), endDate };
 }
 
 // ── Componente ──────────────────────────────────────────────────────────────

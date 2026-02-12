@@ -9,6 +9,7 @@ import React, {
 import type { Session, User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/src/core/config/supabase';
 import { signInWithGoogle as googleSignIn } from '@/src/core/services/googleAuth';
+import { queryClient } from '@/src/core/config/queryClient';
 
 // ─── Tipos del contexto ─────────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = useCallback(async (): Promise<{ error: AuthError | null }> => {
     try {
       const { error } = await supabase.auth.signOut();
+      queryClient.clear();
       return { error };
     } catch (error) {
       if (__DEV__) console.error('[Auth] Error inesperado en signOut:', error);

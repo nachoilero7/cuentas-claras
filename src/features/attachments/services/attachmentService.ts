@@ -1,8 +1,12 @@
 import { File as ExpoFile } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 
 import { supabase } from '@/src/core/config/supabase';
 import type { Attachment } from '@/src/core/types/database';
+
+// ─── Tamaño maximo permitido para adjuntos (10 MB) ─────────────────────────
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // ─── Obtener adjuntos de una transaccion ─────────────────────────────────────
 
@@ -32,6 +36,12 @@ export async function uploadAttachment(
 
   if (authError || !user) {
     return { data: null, error: authError ?? new Error('Usuario no autenticado') };
+  }
+
+  // Verificar tamaño del archivo antes de leerlo en memoria
+  const fileInfo = await FileSystem.getInfoAsync(uri);
+  if (fileInfo.exists && 'size' in fileInfo && fileInfo.size && fileInfo.size > MAX_FILE_SIZE) {
+    return { data: null, error: new Error('El archivo excede el tamaño máximo permitido (10MB)') };
   }
 
   // Leer el archivo como ArrayBuffer usando la nueva API de expo-file-system v19
@@ -66,6 +76,12 @@ export async function uploadAttachment(
     })
     .select('*')
     .single();
+
+  if (error) {
+    // Limpiar archivo huerfano del storage
+    await supabase.storage.from('receipts').remove([filePath]);
+    return { data: null, error };
+  }
 
   return { data: data as Attachment | null, error };
 }

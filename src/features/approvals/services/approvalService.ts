@@ -75,6 +75,21 @@ export async function approveRequest(id: string, comment?: string) {
     return { data: null, error: authError ?? new Error('Usuario no autenticado') };
   }
 
+  // Bloqueo optimista: verificar que la solicitud aun esta pendiente
+  const { data: current, error: checkError } = await supabase
+    .from('approval_requests')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (checkError) {
+    return { data: null, error: checkError };
+  }
+
+  if (current.status !== 'pending') {
+    return { data: null, error: new Error('Esta solicitud ya fue revisada') };
+  }
+
   // Actualizar la solicitud de aprobacion
   const { data: approval, error: approvalError } = await supabase
     .from('approval_requests')
@@ -85,6 +100,7 @@ export async function approveRequest(id: string, comment?: string) {
       comment: comment ?? null,
     })
     .eq('id', id)
+    .eq('status', 'pending') // doble verificacion para evitar race conditions
     .select(APPROVAL_SELECT)
     .single();
 
@@ -94,13 +110,40 @@ export async function approveRequest(id: string, comment?: string) {
 
   // Actualizar el estado de la transaccion asociada a aprobada
   const typedApproval = approval as ApprovalWithDetails;
-  const { error: txError } = await supabase
-    .from('transactions')
-    .update({ status: 'approved' })
-    .eq('id', typedApproval.transaction_id);
 
-  if (txError) {
-    return { data: null, error: txError };
+  try {
+    const { error: txError } = await supabase
+      .from('transactions')
+      .update({ status: 'approved' })
+      .eq('id', typedApproval.transaction_id);
+
+    if (txError) {
+      // Rollback: revertir la solicitud de aprobacion a pendiente
+      await supabase
+        .from('approval_requests')
+        .update({
+          status: 'pending',
+          reviewed_by: null,
+          reviewed_at: null,
+          comment: null,
+        })
+        .eq('id', id);
+
+      return { data: null, error: txError };
+    }
+  } catch (error) {
+    // Rollback: revertir la solicitud de aprobacion a pendiente ante error inesperado
+    await supabase
+      .from('approval_requests')
+      .update({
+        status: 'pending',
+        reviewed_by: null,
+        reviewed_at: null,
+        comment: null,
+      })
+      .eq('id', id);
+
+    throw error;
   }
 
   return { data: typedApproval, error: null };
@@ -119,6 +162,21 @@ export async function rejectRequest(id: string, comment: string) {
     return { data: null, error: authError ?? new Error('Usuario no autenticado') };
   }
 
+  // Bloqueo optimista: verificar que la solicitud aun esta pendiente
+  const { data: current, error: checkError } = await supabase
+    .from('approval_requests')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (checkError) {
+    return { data: null, error: checkError };
+  }
+
+  if (current.status !== 'pending') {
+    return { data: null, error: new Error('Esta solicitud ya fue revisada') };
+  }
+
   // Actualizar la solicitud de aprobacion
   const { data: approval, error: approvalError } = await supabase
     .from('approval_requests')
@@ -129,6 +187,7 @@ export async function rejectRequest(id: string, comment: string) {
       comment,
     })
     .eq('id', id)
+    .eq('status', 'pending') // doble verificacion para evitar race conditions
     .select(APPROVAL_SELECT)
     .single();
 
@@ -138,13 +197,40 @@ export async function rejectRequest(id: string, comment: string) {
 
   // Actualizar el estado de la transaccion asociada a rechazada
   const typedApproval = approval as ApprovalWithDetails;
-  const { error: txError } = await supabase
-    .from('transactions')
-    .update({ status: 'rejected' })
-    .eq('id', typedApproval.transaction_id);
 
-  if (txError) {
-    return { data: null, error: txError };
+  try {
+    const { error: txError } = await supabase
+      .from('transactions')
+      .update({ status: 'rejected' })
+      .eq('id', typedApproval.transaction_id);
+
+    if (txError) {
+      // Rollback: revertir la solicitud de rechazo a pendiente
+      await supabase
+        .from('approval_requests')
+        .update({
+          status: 'pending',
+          reviewed_by: null,
+          reviewed_at: null,
+          comment: null,
+        })
+        .eq('id', id);
+
+      return { data: null, error: txError };
+    }
+  } catch (error) {
+    // Rollback: revertir la solicitud de rechazo a pendiente ante error inesperado
+    await supabase
+      .from('approval_requests')
+      .update({
+        status: 'pending',
+        reviewed_by: null,
+        reviewed_at: null,
+        comment: null,
+      })
+      .eq('id', id);
+
+    throw error;
   }
 
   return { data: typedApproval, error: null };

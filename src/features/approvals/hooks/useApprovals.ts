@@ -8,6 +8,7 @@ import {
 } from '../services/approvalService';
 import type { ApprovalWithDetails } from '../services/approvalService';
 import { sendPushToUser } from '@/src/core/services/pushNotifications';
+import { useOfflineAware } from '@/src/sync';
 
 const ONE_MINUTE = 1000 * 60;
 
@@ -42,12 +43,22 @@ export function useAllApprovals(limit?: number) {
 
 export function useApproveRequest() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async ({ id, comment }: { id: string; comment?: string }) => {
-      const { data, error } = await approveRequest(id, comment);
-      if (error) throw error;
-      return data;
+      const { result, queued } = await executeOrQueue(
+        'approve_request',
+        { id, comment } as unknown as Record<string, unknown>,
+        async () => {
+          const { data, error } = await approveRequest(id, comment);
+          if (error) throw error;
+          return data;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onSuccess: (data) => {
       // Invalidar aprobaciones, transacciones y dashboard para refrescar datos
@@ -72,12 +83,22 @@ export function useApproveRequest() {
 
 export function useRejectRequest() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async ({ id, comment }: { id: string; comment: string }) => {
-      const { data, error } = await rejectRequest(id, comment);
-      if (error) throw error;
-      return data;
+      const { result, queued } = await executeOrQueue(
+        'reject_request',
+        { id, comment } as unknown as Record<string, unknown>,
+        async () => {
+          const { data, error } = await rejectRequest(id, comment);
+          if (error) throw error;
+          return data;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onSuccess: (data) => {
       // Invalidar aprobaciones, transacciones y dashboard para refrescar datos

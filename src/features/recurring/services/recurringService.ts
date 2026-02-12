@@ -1,3 +1,4 @@
+import { addDays, addWeeks, addMonths, addYears, format } from 'date-fns';
 import { supabase } from '@/src/core/config/supabase';
 import type { RecurringTransaction, RecurrenceFrequency } from '@/src/core/types/database';
 
@@ -99,26 +100,32 @@ export async function toggleRecurringTransaction(id: string, isActive: boolean) 
 export function calculateNextExecution(current: string, frequency: RecurrenceFrequency): string {
   const date = new Date(current);
 
+  // Usamos date-fns para evitar drift en fin de mes
+  // (ej: 31 ene → 28 feb → 28 mar con setMonth, pero date-fns maneja correctamente)
+  let next: Date;
+
   switch (frequency) {
     case 'daily':
-      date.setDate(date.getDate() + 1);
+      next = addDays(date, 1);
       break;
     case 'weekly':
-      date.setDate(date.getDate() + 7);
+      next = addWeeks(date, 1);
       break;
     case 'biweekly':
-      date.setDate(date.getDate() + 14);
+      next = addWeeks(date, 2);
       break;
     case 'monthly':
-      date.setMonth(date.getMonth() + 1);
+      next = addMonths(date, 1);
       break;
     case 'quarterly':
-      date.setMonth(date.getMonth() + 3);
+      next = addMonths(date, 3);
       break;
     case 'yearly':
-      date.setFullYear(date.getFullYear() + 1);
+      next = addYears(date, 1);
       break;
+    default:
+      next = date;
   }
 
-  return date.toISOString().split('T')[0];
+  return format(next, 'yyyy-MM-dd');
 }

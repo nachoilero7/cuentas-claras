@@ -2,13 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const QUEUE_KEY = 'cuentas-claras-offline-queue';
 
+// ── Limite maximo de mutaciones en cola (proteccion contra overflow de AsyncStorage)
+const MAX_QUEUE_SIZE = 100;
+
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface OfflineMutation {
   id: string;
   type:
     | 'create_transaction' | 'update_transaction' | 'delete_transaction'
-    | 'create_category' | 'update_category'
+    | 'create_category' | 'update_category' | 'delete_category'
     | 'create_season' | 'update_season' | 'delete_season'
     | 'approve_request' | 'reject_request'
     | 'create_recurring' | 'update_recurring' | 'delete_recurring'
@@ -34,6 +37,27 @@ export async function getOfflineQueue(): Promise<OfflineMutation[]> {
 
 export async function enqueueMutation(mutation: Omit<OfflineMutation, 'id' | 'createdAt' | 'retryCount'>): Promise<void> {
   const queue = await getOfflineQueue();
+
+  // Verificar limite de tamaño para evitar overflow de AsyncStorage
+  if (queue.length >= MAX_QUEUE_SIZE) {
+    throw new Error(
+      `La cola offline está llena (${MAX_QUEUE_SIZE} operaciones pendientes). ` +
+      'Conectate a internet para sincronizar antes de seguir.'
+    );
+  }
+
+  // Deduplicacion: si la ultima mutacion tiene el mismo tipo y payload, no encolar
+  if (queue.length > 0) {
+    const last = queue[queue.length - 1];
+    if (
+      last.type === mutation.type &&
+      JSON.stringify(last.payload) === JSON.stringify(mutation.payload)
+    ) {
+      if (__DEV__) console.log('[OfflineQueue] Mutacion duplicada detectada, omitiendo');
+      return;
+    }
+  }
+
   const newMutation: OfflineMutation = {
     ...mutation,
     id: `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,

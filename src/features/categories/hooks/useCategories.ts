@@ -8,6 +8,7 @@ import {
 } from '../services/categoryService';
 import type { Category } from '@/src/core/types/database';
 import type { UpdateCategoryData } from '../services/categoryService';
+import { useOfflineAware } from '@/src/sync';
 
 const TWO_MINUTES = 1000 * 60 * 2;
 
@@ -43,12 +44,22 @@ export function useCategory(id: string) {
 
 export function useCreateCategory() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async (data: Parameters<typeof createCategory>[0]) => {
-      const { data: category, error } = await createCategory(data);
-      if (error) throw error;
-      return category;
+      const { result, queued } = await executeOrQueue(
+        'create_category',
+        { ...data } as unknown as Record<string, unknown>,
+        async () => {
+          const { data: category, error } = await createCategory(data);
+          if (error) throw error;
+          return category;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onSuccess: () => {
       // Invalidar todas las queries de categorias para refrescar las listas
@@ -61,12 +72,22 @@ export function useCreateCategory() {
 
 export function useUpdateCategory() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & UpdateCategoryData) => {
-      const { data, error } = await updateCategory(id, updates);
-      if (error) throw error;
-      return data;
+      const { result, queued } = await executeOrQueue(
+        'update_category',
+        { id, ...updates } as unknown as Record<string, unknown>,
+        async () => {
+          const { data, error } = await updateCategory(id, updates);
+          if (error) throw error;
+          return data;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onMutate: async (variables: { id: string } & UpdateCategoryData) => {
       const { id, ...updates } = variables;
@@ -125,12 +146,22 @@ export function useUpdateCategory() {
 
 export function useDeleteCategory() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await deleteCategory(id);
-      if (error) throw error;
-      return data;
+      const { result, queued } = await executeOrQueue(
+        'delete_category',
+        { id },
+        async () => {
+          const { data, error } = await deleteCategory(id);
+          if (error) throw error;
+          return data;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onMutate: async (id: string) => {
       // Cancelar queries en curso para evitar sobreescribir la actualizacion optimista
@@ -160,6 +191,9 @@ export function useDeleteCategory() {
     onSuccess: () => {
       // Invalidar las listas de categorias para reflejar la eliminacion
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      // Invalidar transacciones y dashboard ya que referencian categorias
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

@@ -241,11 +241,15 @@ export default function TransactionFormScreen() {
     // Validaciones adicionales
     const newErrors: Record<string, string> = {};
 
-    // Validar tipo de cambio cuando la moneda es USD
-    if (currency === 'USD' && exchangeRate.trim() !== '') {
-      const parsed = parseFloat(exchangeRate.replace(',', '.'));
-      if (isNaN(parsed) || parsed <= 0) {
-        newErrors.exchange_rate = 'El tipo de cambio debe ser un numero positivo';
+    // Validar tipo de cambio obligatorio para USD
+    if (currency === 'USD') {
+      if (!exchangeRate.trim()) {
+        newErrors.exchange_rate = 'El tipo de cambio es obligatorio para transacciones en USD';
+      } else {
+        const parsed = parseFloat(exchangeRate.replace(',', '.'));
+        if (isNaN(parsed) || parsed <= 0) {
+          newErrors.exchange_rate = 'El tipo de cambio debe ser un numero positivo';
+        }
       }
     }
 
@@ -669,7 +673,7 @@ export default function TransactionFormScreen() {
                       onPress={() => setPaymentMethod(option.key)}
                     >
                       <MaterialCommunityIcons
-                        name={option.icon as any}
+                        name={option.icon as keyof typeof MaterialCommunityIcons.glyphMap}
                         size={20}
                         color={isSelected ? colors.primary : colors.textTertiary}
                       />

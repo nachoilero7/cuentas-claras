@@ -97,3 +97,10 @@ export const PAYMENT_METHOD_ICONS: Record<PaymentMethod, string> = {
   digital_wallet: 'cellphone',
   check: 'checkbook',
 };
+
+// ─── Cache durations (ms) ────────────────────────────────────────────────────
+export const CACHE_DURATION = {
+  ONE_MINUTE: 1000 * 60,
+  TWO_MINUTES: 1000 * 60 * 2,
+  FIVE_MINUTES: 1000 * 60 * 5,
+} as const;

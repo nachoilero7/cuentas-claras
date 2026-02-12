@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
 import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
@@ -259,6 +259,10 @@ export default function SeasonsListScreen() {
         renderItem={renderSeasonCard}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={8}
+        windowSize={5}
+        maxToRenderPerBatch={8}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
