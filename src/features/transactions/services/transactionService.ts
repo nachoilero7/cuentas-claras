@@ -1,0 +1,196 @@
+import { supabase } from '@/src/core/config/supabase';
+import type {
+  Transaction,
+  Category,
+  TransactionType,
+  TransactionStatus,
+  CurrencyCode,
+} from '@/src/core/types/database';
+
+// ─── Tipos para transacciones con datos de categoria ────────────────────────
+
+export interface TransactionWithCategory extends Transaction {
+  category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
+  transfer_to_category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
+}
+
+export type CreateTransactionData = {
+  type: TransactionType;
+  amount: number;
+  currency: CurrencyCode;
+  exchange_rate?: number | null;
+  description: string;
+  notes?: string | null;
+  category_id: string;
+  transfer_to_category_id?: string | null;
+  transaction_date: string;
+  season_id?: string | null;
+};
+
+export type UpdateTransactionData = Partial<CreateTransactionData> & {
+  status?: TransactionStatus;
+};
+
+export interface TransactionFilters {
+  seasonId?: string;
+  categoryId?: string;
+  type?: TransactionType;
+  status?: TransactionStatus;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// Select con join de categorias (origen y destino para transferencias)
+const TRANSACTION_SELECT = `
+  *,
+  category:categories!category_id(id, name, color, icon),
+  transfer_to_category:categories!transfer_to_category_id(id, name, color, icon)
+`;
+
+const DEFAULT_LIMIT = 50;
+
+// ─── Listar transacciones con filtros opcionales ────────────────────────────
+
+export async function getTransactions(filters?: TransactionFilters) {
+  let query = supabase
+    .from('transactions')
+    .select(TRANSACTION_SELECT)
+    .order('transaction_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  // Aplicar filtros si se proporcionan
+  if (filters?.seasonId) {
+    query = query.eq('season_id', filters.seasonId);
+  }
+  if (filters?.categoryId) {
+    query = query.eq('category_id', filters.categoryId);
+  }
+  if (filters?.type) {
+    query = query.eq('type', filters.type);
+  }
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters?.startDate) {
+    query = query.gte('transaction_date', filters.startDate);
+  }
+  if (filters?.endDate) {
+    query = query.lte('transaction_date', filters.endDate);
+  }
+
+  // Paginacion
+  const limit = filters?.limit ?? DEFAULT_LIMIT;
+  const offset = filters?.offset ?? 0;
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error } = await query;
+
+  return { data: (data as TransactionWithCategory[] | null) ?? [], error };
+}
+
+// ─── Obtener transaccion por ID ─────────────────────────────────────────────
+
+export async function getTransactionById(id: string) {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(TRANSACTION_SELECT)
+    .eq('id', id)
+    .single();
+
+  return { data: data as TransactionWithCategory | null, error };
+}
+
+// ─── Crear nueva transaccion ────────────────────────────────────────────────
+
+export async function createTransaction(transactionData: CreateTransactionData) {
+  // Obtener el usuario autenticado para asignar created_by
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { data: null, error: authError ?? new Error('Usuario no autenticado') };
+  }
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert({
+      ...transactionData,
+      created_by: user.id,
+      status: 'approved' as TransactionStatus, // Por ahora, aprobada por defecto
+    })
+    .select(TRANSACTION_SELECT)
+    .single();
+
+  return { data: data as TransactionWithCategory | null, error };
+}
+
+// ─── Actualizar transaccion existente ───────────────────────────────────────
+
+export async function updateTransaction(id: string, updates: UpdateTransactionData) {
+  const { data, error } = await supabase
+    .from('transactions')
+    .update(updates)
+    .eq('id', id)
+    .select(TRANSACTION_SELECT)
+    .single();
+
+  return { data: data as TransactionWithCategory | null, error };
+}
+
+// ─── Eliminar transaccion (hard delete, RLS controla el acceso) ─────────────
+
+export async function deleteTransaction(id: string) {
+  const { data, error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id)
+    .select()
+    .single();
+
+  return { data: data as Transaction | null, error };
+}
+
+// ─── Aprobar transaccion ────────────────────────────────────────────────────
+
+export async function approveTransaction(id: string) {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { data: null, error: authError ?? new Error('Usuario no autenticado') };
+  }
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({
+      status: 'approved' as TransactionStatus,
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select(TRANSACTION_SELECT)
+    .single();
+
+  return { data: data as TransactionWithCategory | null, error };
+}
+
+// ─── Rechazar transaccion ───────────────────────────────────────────────────
+
+export async function rejectTransaction(id: string) {
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({
+      status: 'rejected' as TransactionStatus,
+    })
+    .eq('id', id)
+    .select(TRANSACTION_SELECT)
+    .single();
+
+  return { data: data as TransactionWithCategory | null, error };
+}

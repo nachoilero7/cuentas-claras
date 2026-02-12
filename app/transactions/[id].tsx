@@ -1,0 +1,830 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  Pressable,
+} from 'react-native';
+import { Text, Chip } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { z } from 'zod';
+
+import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useCategories } from '@/src/features/categories/hooks/useCategories';
+import {
+  useTransaction,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+} from '@/src/features/transactions/hooks/useTransactions';
+import { Input } from '@/src/shared/components/ui/Input';
+import { Button } from '@/src/shared/components/ui/Button';
+import { TRANSACTION_TYPE_LABELS } from '@/src/core/config/constants';
+import { spacing } from '@/src/shared/theme';
+import type { TransactionType, CurrencyCode } from '@/src/core/types/database';
+
+// ── Colores financieros ─────────────────────────────────────────────────────
+
+const FINANCIAL_COLORS = {
+  income: '#16a34a',
+  expense: '#ef4444',
+  transfer: '#3b82f6',
+} as const;
+
+// ── Configuracion de tipos ──────────────────────────────────────────────────
+
+interface TypeOption {
+  key: TransactionType;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  color: string;
+}
+
+const TYPE_OPTIONS: TypeOption[] = [
+  { key: 'income', label: 'Ingreso', icon: 'trending-up', color: FINANCIAL_COLORS.income },
+  { key: 'expense', label: 'Egreso', icon: 'trending-down', color: FINANCIAL_COLORS.expense },
+  { key: 'transfer', label: 'Transferencia', icon: 'swap-horizontal', color: FINANCIAL_COLORS.transfer },
+];
+
+const CURRENCY_OPTIONS: CurrencyCode[] = ['ARS', 'USD'];
+
+// ── Esquema de validacion con Zod ───────────────────────────────────────────
+
+const transactionSchema = z.object({
+  type: z.enum(['income', 'expense', 'transfer'], {
+    required_error: 'Selecciona un tipo de movimiento',
+  }),
+  amount: z
+    .string()
+    .min(1, 'El monto es obligatorio')
+    .refine(
+      (val) => {
+        const num = parseFloat(val.replace(',', '.'));
+        return !isNaN(num) && num > 0;
+      },
+      { message: 'El monto debe ser un numero positivo' }
+    ),
+  currency: z.enum(['ARS', 'USD']),
+  exchange_rate: z.string().optional(),
+  description: z
+    .string()
+    .min(2, 'La descripcion debe tener al menos 2 caracteres')
+    .max(200, 'La descripcion no puede exceder 200 caracteres'),
+  notes: z
+    .string()
+    .max(500, 'Las notas no pueden exceder 500 caracteres')
+    .optional()
+    .or(z.literal('')),
+  category_id: z.string().uuid('Selecciona un rubro'),
+  transfer_to_category_id: z.string().optional(),
+  transaction_date: z
+    .string()
+    .min(1, 'La fecha es obligatoria')
+    .refine(
+      (val) => {
+        // Validar formato DD/MM/YYYY
+        const parts = val.split('/');
+        if (parts.length !== 3) return false;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return false;
+        const date = new Date(year, month - 1, day);
+        return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+      },
+      { message: 'Ingresa una fecha valida en formato DD/MM/AAAA' }
+    ),
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function parseDateToISO(dateStr: string): string {
+  const parts = dateStr.split('/');
+  const day = parts[0].padStart(2, '0');
+  const month = parts[1].padStart(2, '0');
+  const year = parts[2];
+  return `${year}-${month}-${day}`;
+}
+
+function formatISOToDisplay(isoDate: string): string {
+  if (!isoDate) return '';
+  const parts = isoDate.split('T')[0].split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function getTodayFormatted(): string {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// ── Componente ──────────────────────────────────────────────────────────────
+
+export default function TransactionFormScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useAppTheme();
+  const { data: profile } = useProfile();
+  const { data: categories } = useCategories();
+
+  const isCreateMode = id === 'new';
+  const role = profile?.role ?? 'viewer';
+  const isAdmin = role === 'admin';
+
+  // Hooks de datos
+  const { data: transaction, isLoading: isTransactionLoading } = useTransaction(
+    isCreateMode ? '' : id!
+  );
+  const createTransaction = useCreateTransaction();
+  const updateTransaction = useUpdateTransaction();
+  const deleteTransaction = useDeleteTransaction();
+
+  // Estado del formulario
+  const [type, setType] = useState<TransactionType>('expense');
+  const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState<CurrencyCode>('ARS');
+  const [exchangeRate, setExchangeRate] = useState('');
+  const [description, setDescription] = useState('');
+  const [notes, setNotes] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [transferToCategoryId, setTransferToCategoryId] = useState('');
+  const [transactionDate, setTransactionDate] = useState(getTodayFormatted());
+
+  // Estado de errores
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Pre-rellenar en modo edicion
+  useEffect(() => {
+    if (!isCreateMode && transaction) {
+      setType(transaction.type);
+      setAmount(String(transaction.amount));
+      setCurrency(transaction.currency);
+      setExchangeRate(
+        transaction.exchange_rate !== null ? String(transaction.exchange_rate) : ''
+      );
+      setDescription(transaction.description ?? '');
+      setNotes(transaction.notes ?? '');
+      setCategoryId(transaction.category_id ?? '');
+      setTransferToCategoryId(transaction.transfer_to_category_id ?? '');
+      setTransactionDate(formatISOToDisplay(transaction.transaction_date));
+    }
+  }, [isCreateMode, transaction]);
+
+  // Categorias activas
+  const activeCategories = useMemo(() => {
+    if (!categories) return [];
+    return categories.filter((c) => c.is_active);
+  }, [categories]);
+
+  // ── Validacion ────────────────────────────────────────────────────────────
+
+  const validate = useCallback((): boolean => {
+    const dataToValidate = {
+      type,
+      amount,
+      currency,
+      exchange_rate: exchangeRate,
+      description,
+      notes,
+      category_id: categoryId,
+      transfer_to_category_id: transferToCategoryId,
+      transaction_date: transactionDate,
+    };
+
+    const result = transactionSchema.safeParse(dataToValidate);
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as string;
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = issue.message;
+        }
+      }
+      setErrors(fieldErrors);
+      return false;
+    }
+
+    // Validaciones adicionales
+    const newErrors: Record<string, string> = {};
+
+    // Validar tipo de cambio cuando la moneda es USD
+    if (currency === 'USD' && exchangeRate.trim() !== '') {
+      const parsed = parseFloat(exchangeRate.replace(',', '.'));
+      if (isNaN(parsed) || parsed <= 0) {
+        newErrors.exchange_rate = 'El tipo de cambio debe ser un numero positivo';
+      }
+    }
+
+    // Validar rubro destino en transferencias
+    if (type === 'transfer') {
+      if (!transferToCategoryId) {
+        newErrors.transfer_to_category_id = 'Selecciona un rubro destino para la transferencia';
+      } else if (transferToCategoryId === categoryId) {
+        newErrors.transfer_to_category_id = 'El rubro destino debe ser diferente al rubro origen';
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return false;
+    }
+
+    setErrors({});
+    return true;
+  }, [type, amount, currency, exchangeRate, description, notes, categoryId, transferToCategoryId, transactionDate]);
+
+  // ── Enviar formulario ─────────────────────────────────────────────────────
+
+  const handleSubmit = useCallback(async () => {
+    if (!validate()) return;
+
+    const parsedAmount = parseFloat(amount.replace(',', '.'));
+    const parsedExchangeRate = exchangeRate.trim()
+      ? parseFloat(exchangeRate.replace(',', '.'))
+      : null;
+
+    const payload = {
+      type,
+      amount: parsedAmount,
+      currency,
+      exchange_rate: parsedExchangeRate,
+      amount_in_ars: currency === 'USD' && parsedExchangeRate
+        ? parsedAmount * parsedExchangeRate
+        : currency === 'ARS'
+          ? parsedAmount
+          : null,
+      description: description.trim(),
+      notes: notes.trim() || null,
+      category_id: categoryId,
+      transfer_to_category_id: type === 'transfer' ? transferToCategoryId : null,
+      transaction_date: parseDateToISO(transactionDate),
+    };
+
+    try {
+      if (isCreateMode) {
+        await createTransaction.mutateAsync(payload);
+        Alert.alert('Movimiento registrado', 'El movimiento se registro correctamente.', [
+          { text: 'Aceptar', onPress: () => router.back() },
+        ]);
+      } else {
+        await updateTransaction.mutateAsync({ id: id!, ...payload });
+        Alert.alert('Movimiento actualizado', 'Los cambios se guardaron correctamente.', [
+          { text: 'Aceptar', onPress: () => router.back() },
+        ]);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
+      Alert.alert('Error', message);
+    }
+  }, [
+    validate,
+    type,
+    amount,
+    currency,
+    exchangeRate,
+    description,
+    notes,
+    categoryId,
+    transferToCategoryId,
+    transactionDate,
+    isCreateMode,
+    id,
+    createTransaction,
+    updateTransaction,
+  ]);
+
+  // ── Eliminar movimiento ───────────────────────────────────────────────────
+
+  const handleDelete = useCallback(() => {
+    Alert.alert(
+      'Eliminar movimiento',
+      'Estas seguro que deseas eliminar este movimiento? Esta accion no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTransaction.mutateAsync(id!);
+              Alert.alert('Movimiento eliminado', 'El movimiento se elimino correctamente.', [
+                { text: 'Aceptar', onPress: () => router.back() },
+              ]);
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
+              Alert.alert('Error', message);
+            }
+          },
+        },
+      ]
+    );
+  }, [id, deleteTransaction]);
+
+  // ── Estado de carga ───────────────────────────────────────────────────────
+
+  const isSubmitting = createTransaction.isPending || updateTransaction.isPending;
+  const isDeleting = deleteTransaction.isPending;
+
+  // ── Cargando en modo edicion ──────────────────────────────────────────────
+
+  if (!isCreateMode && isTransactionLoading) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <Stack.Screen
+          options={{
+            title: 'Editar Movimiento',
+          }}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text
+            variant="bodyMedium"
+            style={{ color: colors.textSecondary, marginTop: spacing.sm }}
+          >
+            Cargando movimiento...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Formulario ────────────────────────────────────────────────────────────
+
+  return (
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: colors.background }]}
+      edges={['bottom']}
+    >
+      <Stack.Screen
+        options={{
+          title: isCreateMode ? 'Nuevo Movimiento' : 'Editar Movimiento',
+        }}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Tarjeta de formulario ──────────────────────────────────── */}
+          <View style={[styles.form, { backgroundColor: colors.surface }]}>
+            <Text
+              variant="headlineSmall"
+              style={[styles.formTitle, { color: colors.text }]}
+            >
+              {isCreateMode ? 'Nuevo Movimiento' : 'Editar Movimiento'}
+            </Text>
+
+            {/* ── Selector de tipo (solo en creacion) ────────────────── */}
+            {isCreateMode && (
+              <View style={styles.section}>
+                <Text
+                  variant="labelLarge"
+                  style={[styles.sectionLabel, { color: colors.textSecondary }]}
+                >
+                  Tipo de movimiento
+                </Text>
+                <View style={styles.typeSelector}>
+                  {TYPE_OPTIONS.map((option) => {
+                    const isSelected = type === option.key;
+                    return (
+                      <Pressable
+                        key={option.key}
+                        style={[
+                          styles.typeCard,
+                          {
+                            backgroundColor: isSelected
+                              ? option.color + '18'
+                              : colors.surfaceVariant,
+                            borderColor: isSelected ? option.color : colors.outlineVariant,
+                            borderWidth: isSelected ? 2 : 1,
+                          },
+                        ]}
+                        onPress={() => setType(option.key)}
+                      >
+                        <View
+                          style={[
+                            styles.typeIconContainer,
+                            { backgroundColor: isSelected ? option.color + '25' : colors.surface },
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name={option.icon}
+                            size={24}
+                            color={isSelected ? option.color : colors.textTertiary}
+                          />
+                        </View>
+                        <Text
+                          variant="labelMedium"
+                          style={{
+                            color: isSelected ? option.color : colors.textSecondary,
+                            fontWeight: isSelected ? '700' : '500',
+                          }}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {errors.type ? (
+                  <Text variant="bodySmall" style={[styles.errorText, { color: colors.error }]}>
+                    {errors.type}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            {/* ── Tipo (solo lectura en edicion) ─────────────────────── */}
+            {!isCreateMode && (
+              <View style={styles.section}>
+                <Text
+                  variant="labelLarge"
+                  style={[styles.sectionLabel, { color: colors.textSecondary }]}
+                >
+                  Tipo de movimiento
+                </Text>
+                <View style={styles.readOnlyType}>
+                  <View
+                    style={[
+                      styles.typeIconSmall,
+                      { backgroundColor: FINANCIAL_COLORS[type] + '18' },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={TYPE_OPTIONS.find((o) => o.key === type)?.icon ?? 'help'}
+                      size={20}
+                      color={FINANCIAL_COLORS[type]}
+                    />
+                  </View>
+                  <Text
+                    variant="titleSmall"
+                    style={{ color: FINANCIAL_COLORS[type], fontWeight: '600' }}
+                  >
+                    {TRANSACTION_TYPE_LABELS[type]}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* ── Monto ──────────────────────────────────────────────── */}
+            <Input
+              label="Monto"
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0,00"
+              leftIcon="cash"
+              error={errors.amount}
+              keyboardType="numeric"
+              inputStyle={styles.amountInput}
+            />
+
+            {/* ── Moneda ─────────────────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text
+                variant="labelLarge"
+                style={[styles.sectionLabel, { color: colors.textSecondary }]}
+              >
+                Moneda
+              </Text>
+              <View style={styles.currencyChips}>
+                {CURRENCY_OPTIONS.map((curr) => {
+                  const isSelected = currency === curr;
+                  return (
+                    <Chip
+                      key={curr}
+                      mode={isSelected ? 'flat' : 'outlined'}
+                      selected={isSelected}
+                      onPress={() => setCurrency(curr)}
+                      style={[
+                        styles.currencyChip,
+                        isSelected
+                          ? { backgroundColor: colors.primary }
+                          : { backgroundColor: colors.surface, borderColor: colors.outline },
+                      ]}
+                      textStyle={{
+                        color: isSelected ? colors.onPrimary : colors.textSecondary,
+                        fontWeight: isSelected ? '700' : '500',
+                      }}
+                      showSelectedOverlay={false}
+                      showSelectedCheck={false}
+                    >
+                      {curr}
+                    </Chip>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ── Tipo de cambio (solo USD) ───────────────────────────── */}
+            {currency === 'USD' && (
+              <Input
+                label="Tipo de cambio"
+                value={exchangeRate}
+                onChangeText={setExchangeRate}
+                placeholder="Ej: 1050,00"
+                leftIcon="currency-usd"
+                error={errors.exchange_rate}
+                keyboardType="numeric"
+                helperText="Cotizacion del dolar para convertir a pesos"
+              />
+            )}
+
+            {/* ── Descripcion ────────────────────────────────────────── */}
+            <Input
+              label="Descripcion"
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Ej: Compra de materiales"
+              leftIcon="text-box-outline"
+              error={errors.description}
+              maxLength={200}
+              autoCapitalize="sentences"
+              returnKeyType="next"
+            />
+
+            {/* ── Notas ──────────────────────────────────────────────── */}
+            <Input
+              label="Notas"
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Notas adicionales (opcional)"
+              leftIcon="note-text-outline"
+              error={errors.notes}
+              multiline
+              numberOfLines={3}
+              maxLength={500}
+              autoCapitalize="sentences"
+            />
+
+            {/* ── Rubro ──────────────────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text
+                variant="labelLarge"
+                style={[styles.sectionLabel, { color: colors.textSecondary }]}
+              >
+                Rubro {type === 'transfer' ? '(origen)' : ''}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryChipsContainer}
+              >
+                {activeCategories.map((cat) => {
+                  const isSelected = categoryId === cat.id;
+                  const catColor = cat.color ?? colors.primary;
+                  return (
+                    <Chip
+                      key={cat.id}
+                      mode={isSelected ? 'flat' : 'outlined'}
+                      selected={isSelected}
+                      icon={isSelected ? 'check' : cat.icon ?? 'tag'}
+                      onPress={() => setCategoryId(cat.id)}
+                      style={[
+                        styles.categoryChip,
+                        isSelected
+                          ? { backgroundColor: catColor + '25', borderColor: catColor, borderWidth: 1.5 }
+                          : { backgroundColor: colors.surface, borderColor: colors.outline },
+                      ]}
+                      textStyle={{
+                        color: isSelected ? catColor : colors.textSecondary,
+                        fontWeight: isSelected ? '600' : '400',
+                      }}
+                      showSelectedOverlay={false}
+                      showSelectedCheck={false}
+                    >
+                      {cat.name}
+                    </Chip>
+                  );
+                })}
+              </ScrollView>
+              {errors.category_id ? (
+                <Text variant="bodySmall" style={[styles.errorText, { color: colors.error }]}>
+                  {errors.category_id}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* ── Rubro destino (solo transferencias) ─────────────────── */}
+            {type === 'transfer' && (
+              <View style={styles.section}>
+                <Text
+                  variant="labelLarge"
+                  style={[styles.sectionLabel, { color: colors.textSecondary }]}
+                >
+                  Rubro destino
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryChipsContainer}
+                >
+                  {activeCategories
+                    .filter((cat) => cat.id !== categoryId)
+                    .map((cat) => {
+                      const isSelected = transferToCategoryId === cat.id;
+                      const catColor = cat.color ?? colors.primary;
+                      return (
+                        <Chip
+                          key={cat.id}
+                          mode={isSelected ? 'flat' : 'outlined'}
+                          selected={isSelected}
+                          icon={isSelected ? 'check' : cat.icon ?? 'tag'}
+                          onPress={() => setTransferToCategoryId(cat.id)}
+                          style={[
+                            styles.categoryChip,
+                            isSelected
+                              ? { backgroundColor: catColor + '25', borderColor: catColor, borderWidth: 1.5 }
+                              : { backgroundColor: colors.surface, borderColor: colors.outline },
+                          ]}
+                          textStyle={{
+                            color: isSelected ? catColor : colors.textSecondary,
+                            fontWeight: isSelected ? '600' : '400',
+                          }}
+                          showSelectedOverlay={false}
+                          showSelectedCheck={false}
+                        >
+                          {cat.name}
+                        </Chip>
+                      );
+                    })}
+                </ScrollView>
+                {errors.transfer_to_category_id ? (
+                  <Text variant="bodySmall" style={[styles.errorText, { color: colors.error }]}>
+                    {errors.transfer_to_category_id}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            {/* ── Fecha ──────────────────────────────────────────────── */}
+            <Input
+              label="Fecha"
+              value={transactionDate}
+              onChangeText={setTransactionDate}
+              placeholder="DD/MM/AAAA"
+              leftIcon="calendar"
+              error={errors.transaction_date}
+              helperText="Formato: DD/MM/AAAA"
+              keyboardType="default"
+              maxLength={10}
+            />
+
+            {/* ── Boton de enviar ────────────────────────────────────── */}
+            <View style={styles.submitSection}>
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={isSubmitting}
+                disabled={isSubmitting || isDeleting}
+                onPress={handleSubmit}
+                icon={isCreateMode ? 'plus-circle-outline' : 'content-save-outline'}
+              >
+                {isCreateMode ? 'Registrar Movimiento' : 'Guardar Cambios'}
+              </Button>
+            </View>
+
+            {/* ── Boton de eliminar (solo edicion y admin) ────────────── */}
+            {!isCreateMode && isAdmin && (
+              <View style={styles.deleteSection}>
+                <Button
+                  variant="outline"
+                  size="md"
+                  fullWidth
+                  loading={isDeleting}
+                  disabled={isSubmitting || isDeleting}
+                  onPress={handleDelete}
+                  icon="delete-outline"
+                >
+                  Eliminar Movimiento
+                </Button>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+// ── Estilos ─────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  form: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  formTitle: {
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  section: {
+    gap: spacing.sm,
+  },
+  sectionLabel: {
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  typeCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 12,
+    gap: spacing.sm,
+  },
+  typeIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readOnlyType: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  typeIconSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  amountInput: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  currencyChips: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  currencyChip: {
+    borderRadius: 20,
+  },
+  categoryChipsContainer: {
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  categoryChip: {
+    borderRadius: 20,
+  },
+  errorText: {
+    marginTop: spacing.xxs,
+    fontSize: 12,
+  },
+  submitSection: {
+    marginTop: spacing.md,
+  },
+  deleteSection: {
+    marginTop: spacing.sm,
+  },
+});
