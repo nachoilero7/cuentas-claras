@@ -24,6 +24,7 @@ import {
 import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
 import { EmptyState } from '@/src/shared/components/feedback/EmptyState';
+import { AttachmentGallery } from '@/src/features/attachments/components';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { formatDate } from '@/src/core/utils/date';
 import { spacing, borderRadius } from '@/src/shared/theme';
@@ -317,6 +318,9 @@ export default function ApprovalsListScreen() {
               Solicitado por: {item.requester?.full_name ?? 'Desconocido'}
             </Text>
           </View>
+
+          {/* Comprobantes adjuntos */}
+          <AttachmentGallery transactionId={item.transaction_id} />
 
           {/* Botones de accion (solo admin) */}
           {isAdmin ? (

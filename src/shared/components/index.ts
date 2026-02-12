@@ -3,7 +3,7 @@
  */
 
 // UI
-export { Button, Card, CardHeader, CardActions, Input } from './ui';
+export { Button, Card, CardHeader, CardActions, Input, ImageViewer } from './ui';
 export type {
   ButtonProps,
   ButtonVariant,
@@ -14,6 +14,7 @@ export type {
   CardHeaderProps,
   CardActionsProps,
   InputProps,
+  ImageViewerProps,
 } from './ui';
 
 // Layout

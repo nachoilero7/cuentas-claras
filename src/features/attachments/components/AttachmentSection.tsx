@@ -19,6 +19,7 @@ import {
   getAttachmentUrl,
 } from '../services/attachmentService';
 import { spacing } from '@/src/shared/theme';
+import { ImageViewer } from '@/src/shared/components/ui/ImageViewer';
 import type { Attachment } from '@/src/core/types/database';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -44,10 +45,12 @@ function AttachmentThumbnail({
   attachment,
   onDelete,
   isDeleting,
+  onView,
 }: {
   attachment: Attachment;
   onDelete: () => void;
   isDeleting: boolean;
+  onView: (url: string) => void;
 }) {
   const { colors } = useAppTheme();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -77,13 +80,24 @@ function AttachmentThumbnail({
 
   return (
     <View style={[styles.thumbnailContainer, { backgroundColor: colors.surfaceVariant }]}>
-      {loading ? (
-        <ActivityIndicator size="small" color={colors.primary} />
-      ) : signedUrl ? (
-        <Image source={{ uri: signedUrl }} style={styles.thumbnailImage} />
-      ) : (
-        <MaterialCommunityIcons name="file-image-outline" size={32} color={colors.textTertiary} />
-      )}
+      {/* Imagen con tap para ver a pantalla completa */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={() => signedUrl && onView(signedUrl)}
+        disabled={loading || !signedUrl}
+      >
+        {loading ? (
+          <View style={styles.thumbnailCentered}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : signedUrl ? (
+          <Image source={{ uri: signedUrl }} style={styles.thumbnailImage} />
+        ) : (
+          <View style={styles.thumbnailCentered}>
+            <MaterialCommunityIcons name="file-image-outline" size={32} color={colors.textTertiary} />
+          </View>
+        )}
+      </Pressable>
 
       {/* Boton eliminar */}
       <Pressable
@@ -117,6 +131,9 @@ export default function AttachmentSection({
   onPendingImagesChange,
 }: AttachmentSectionProps) {
   const { colors } = useAppTheme();
+
+  // Estado del visor de imagenes a pantalla completa
+  const [viewerImage, setViewerImage] = useState<{ url: string; fileName: string } | null>(null);
 
   // Solo cargar adjuntos existentes en modo edicion
   const { data: existingAttachments, isLoading } = useAttachments(transactionId ?? '');
@@ -264,6 +281,7 @@ export default function AttachmentSection({
             attachment={att}
             onDelete={() => handleDeleteAttachment(att)}
             isDeleting={deleteMutation.isPending}
+            onView={(url) => setViewerImage({ url, fileName: att.file_name })}
           />
         ))}
 
@@ -273,7 +291,13 @@ export default function AttachmentSection({
             key={`pending-${index}`}
             style={[styles.thumbnailContainer, { backgroundColor: colors.surfaceVariant }]}
           >
-            <Image source={{ uri: img.uri }} style={styles.thumbnailImage} />
+            {/* Tap para ver imagen pendiente a pantalla completa */}
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setViewerImage({ url: img.uri, fileName: img.fileName })}
+            >
+              <Image source={{ uri: img.uri }} style={styles.thumbnailImage} />
+            </Pressable>
             <Pressable
               style={[styles.deleteButton, { backgroundColor: colors.error }]}
               onPress={() => handleRemovePending(index)}
@@ -318,6 +342,14 @@ export default function AttachmentSection({
           </Text>
         </Pressable>
       </ScrollView>
+
+      {/* Visor de imagen a pantalla completa */}
+      <ImageViewer
+        visible={!!viewerImage}
+        imageUrl={viewerImage?.url ?? ''}
+        fileName={viewerImage?.fileName}
+        onClose={() => setViewerImage(null)}
+      />
     </View>
   );
 }
@@ -358,6 +390,11 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 10,
+  },
+  thumbnailCentered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thumbnailLabel: {
     position: 'absolute',
