@@ -2,3 +2,4 @@ export { persistQueryCache, restoreQueryCache, clearPersistedCache } from './que
 export { getOfflineQueue, enqueueMutation, dequeueMutation, clearOfflineQueue, getQueueSize } from './offlineQueue';
 export type { OfflineMutation } from './offlineQueue';
 export { processOfflineQueue, startSyncListener } from './SyncManager';
+export { useOfflineAware } from './useOfflineAware';

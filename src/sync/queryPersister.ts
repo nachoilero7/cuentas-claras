@@ -17,7 +17,7 @@ export async function persistQueryCache(queryClient: QueryClient): Promise<void>
       }));
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(serializable));
   } catch (error) {
-    console.warn('[Sync] Error al persistir cache:', error);
+    if (__DEV__) console.warn('[Sync] Error al persistir cache:', error);
   }
 }
 
@@ -40,9 +40,9 @@ export async function restoreQueryCache(queryClient: QueryClient): Promise<void>
       });
     }
 
-    console.log(`[Sync] Cache restaurado: ${entries.length} queries`);
+    if (__DEV__) console.log(`[Sync] Cache restaurado: ${entries.length} queries`);
   } catch (error) {
-    console.warn('[Sync] Error al restaurar cache:', error);
+    if (__DEV__) console.warn('[Sync] Error al restaurar cache:', error);
   }
 }
 
@@ -52,6 +52,6 @@ export async function clearPersistedCache(): Promise<void> {
   try {
     await AsyncStorage.removeItem(CACHE_KEY);
   } catch (error) {
-    console.warn('[Sync] Error al limpiar cache:', error);
+    if (__DEV__) console.warn('[Sync] Error al limpiar cache:', error);
   }
 }

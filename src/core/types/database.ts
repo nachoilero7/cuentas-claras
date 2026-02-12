@@ -169,6 +169,29 @@ export interface Notification {
   created_at: string;
 }
 
+// ─── Transaccion recurrente ──────────────────────────────────────────────────
+
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface RecurringTransaction {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  currency: CurrencyCode;
+  description: string;
+  notes: string | null;
+  payment_method: PaymentMethod | null;
+  category_id: string;
+  transfer_to_category_id: string | null;
+  frequency: RecurrenceFrequency;
+  next_execution: string;
+  last_executed_at: string | null;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── Registro de auditoria ──────────────────────────────────────────────────
 
 export interface AuditLogEntry {

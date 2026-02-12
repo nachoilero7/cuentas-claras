@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useBiometric } from '@/src/features/security';
 import {
   usePendingApprovals,
   useAllApprovals,
@@ -28,21 +29,6 @@ import { formatDate } from '@/src/core/utils/date';
 import { spacing, borderRadius } from '@/src/shared/theme';
 import type { ApprovalWithDetails } from '@/src/features/approvals/services/approvalService';
 import type { CurrencyCode } from '@/src/core/types/database';
-
-// ── Colores financieros por tipo de transaccion ─────────────────────────────
-
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
-
-function getAmountColor(type: string | undefined): string {
-  if (type === 'income') return FINANCIAL_COLORS.income;
-  if (type === 'expense') return FINANCIAL_COLORS.expense;
-  if (type === 'transfer') return FINANCIAL_COLORS.transfer;
-  return '#666666';
-}
 
 // ── Componente principal ────────────────────────────────────────────────────
 
@@ -67,6 +53,7 @@ export default function ApprovalsListScreen() {
 
   const approveMutation = useApproveRequest();
   const rejectMutation = useRejectRequest();
+  const { authenticate } = useBiometric();
 
   // Modal de rechazo (Alert.prompt solo funciona en iOS)
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -96,7 +83,11 @@ export default function ApprovalsListScreen() {
   // ── Aprobar solicitud ─────────────────────────────────────────────────────
 
   const handleApprove = useCallback(
-    (approvalId: string) => {
+    async (approvalId: string) => {
+      // Verificacion biometrica antes de aprobar
+      const authenticated = await authenticate('Confirma tu identidad para aprobar la transaccion');
+      if (!authenticated) return;
+
       Alert.alert(
         'Confirmar aprobacion',
         'Esta seguro de que desea aprobar esta transaccion?',
@@ -124,7 +115,7 @@ export default function ApprovalsListScreen() {
         ],
       );
     },
-    [approveMutation],
+    [approveMutation, authenticate],
   );
 
   // ── Rechazar solicitud ────────────────────────────────────────────────────
@@ -135,7 +126,7 @@ export default function ApprovalsListScreen() {
     setRejectModalVisible(true);
   }, []);
 
-  const confirmReject = useCallback(() => {
+  const confirmReject = useCallback(async () => {
     if (!rejectingId) return;
 
     const comment = rejectComment.trim();
@@ -143,6 +134,10 @@ export default function ApprovalsListScreen() {
       Alert.alert('Error', 'Debes ingresar un comentario para rechazar.');
       return;
     }
+
+    // Verificacion biometrica antes de rechazar
+    const authenticated = await authenticate('Confirma tu identidad para rechazar la transaccion');
+    if (!authenticated) return;
 
     rejectMutation.mutate(
       { id: rejectingId, comment },
@@ -160,7 +155,7 @@ export default function ApprovalsListScreen() {
         },
       },
     );
-  }, [rejectingId, rejectComment, rejectMutation]);
+  }, [rejectingId, rejectComment, rejectMutation, authenticate]);
 
   // ── Guard: solo admin o manager pueden acceder ────────────────────────────
 
@@ -246,7 +241,7 @@ export default function ApprovalsListScreen() {
 
   const renderPendingItem = ({ item }: { item: ApprovalWithDetails }) => {
     const tx = item.transaction;
-    const amountColor = getAmountColor(tx?.type);
+    const amountColor = tx?.type === 'income' ? colors.income : tx?.type === 'expense' ? colors.expense : tx?.type === 'transfer' ? colors.transfer : colors.textSecondary;
     const formattedAmount = formatCurrency(tx?.amount ?? 0, (tx?.currency as CurrencyCode) ?? 'ARS');
     const formattedDate = tx?.transaction_date ? formatDate(tx.transaction_date) : '';
 
@@ -332,7 +327,7 @@ export default function ApprovalsListScreen() {
                 icon="check"
                 onPress={() => handleApprove(item.id)}
                 loading={approveMutation.isPending}
-                style={styles.approveButton}
+                style={{ ...styles.approveButton, backgroundColor: colors.income, borderColor: colors.income }}
                 labelStyle={{ color: '#ffffff' }}
               >
                 Aprobar
@@ -343,8 +338,8 @@ export default function ApprovalsListScreen() {
                 icon="close"
                 onPress={() => openRejectModal(item.id)}
                 loading={rejectMutation.isPending}
-                style={styles.rejectButton}
-                labelStyle={{ color: FINANCIAL_COLORS.expense }}
+                style={{ ...styles.rejectButton, borderColor: colors.expense }}
+                labelStyle={{ color: colors.expense }}
               >
                 Rechazar
               </Button>
@@ -359,12 +354,12 @@ export default function ApprovalsListScreen() {
 
   const renderReviewedItem = ({ item }: { item: ApprovalWithDetails }) => {
     const tx = item.transaction;
-    const amountColor = getAmountColor(tx?.type);
+    const amountColor = tx?.type === 'income' ? colors.income : tx?.type === 'expense' ? colors.expense : tx?.type === 'transfer' ? colors.transfer : colors.textSecondary;
     const formattedAmount = formatCurrency(tx?.amount ?? 0, (tx?.currency as CurrencyCode) ?? 'ARS');
 
     const isApproved = item.status === 'approved';
     const statusLabel = isApproved ? 'Aprobada' : 'Rechazada';
-    const statusColor = isApproved ? FINANCIAL_COLORS.income : FINANCIAL_COLORS.expense;
+    const statusColor = isApproved ? colors.success : colors.error;
     const statusIcon = isApproved ? 'check-circle-outline' : 'close-circle-outline';
 
     const cardStyle: import('react-native').ViewStyle = {
@@ -541,7 +536,7 @@ export default function ApprovalsListScreen() {
               size="md"
               onPress={confirmReject}
               loading={rejectMutation.isPending}
-              style={{ flex: 1, backgroundColor: FINANCIAL_COLORS.expense, borderColor: FINANCIAL_COLORS.expense }}
+              style={{ flex: 1, backgroundColor: colors.expense, borderColor: colors.expense }}
               labelStyle={{ color: '#ffffff' }}
             >
               Rechazar
@@ -606,12 +601,9 @@ const styles = StyleSheet.create({
   },
   approveButton: {
     flex: 1,
-    backgroundColor: '#16a34a',
-    borderColor: '#16a34a',
   },
   rejectButton: {
     flex: 1,
-    borderColor: '#ef4444',
   },
   reviewedSection: {
     marginTop: spacing.lg,

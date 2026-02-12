@@ -4,9 +4,33 @@ import { getOfflineQueue, dequeueMutation, incrementRetryCount } from './offline
 import { persistQueryCache } from './queryPersister';
 import { createTransaction, updateTransaction, deleteTransaction } from '@/src/features/transactions/services/transactionService';
 import { createCategory, updateCategory } from '@/src/features/categories/services/categoryService';
+import { createSeason, updateSeason, deleteSeason } from '@/src/features/seasons/services/seasonService';
+import { approveRequest, rejectRequest } from '@/src/features/approvals/services/approvalService';
+import { createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction } from '@/src/features/recurring/services';
+import { upsertBudgetAlert, deleteBudgetAlert } from '@/src/features/budget/services/budgetAlertService';
 import type { OfflineMutation } from './offlineQueue';
 
 const MAX_RETRIES = 3;
+
+// ── Mapeo de tipo de mutacion a query keys para invalidar ───────────────────
+
+const MUTATION_QUERY_KEYS: Record<string, string[][]> = {
+  create_transaction: [['transactions'], ['reports'], ['category-balances']],
+  update_transaction: [['transactions'], ['reports'], ['category-balances']],
+  delete_transaction: [['transactions'], ['reports'], ['category-balances']],
+  create_category: [['categories']],
+  update_category: [['categories'], ['category-balances']],
+  create_season: [['seasons']],
+  update_season: [['seasons']],
+  delete_season: [['seasons']],
+  approve_request: [['approvals'], ['transactions']],
+  reject_request: [['approvals'], ['transactions']],
+  create_recurring: [['recurring-transactions']],
+  update_recurring: [['recurring-transactions']],
+  delete_recurring: [['recurring-transactions']],
+  upsert_budget_alert: [['budget-alerts']],
+  delete_budget_alert: [['budget-alerts']],
+};
 
 // ── Procesar una mutacion individual ─────────────────────────────────────────
 
@@ -35,12 +59,56 @@ async function processMutation(mutation: OfflineMutation): Promise<boolean> {
         const { error } = await updateCategory(id, updates);
         return !error;
       }
+      case 'create_season': {
+        const { error } = await createSeason(mutation.payload as any);
+        return !error;
+      }
+      case 'update_season': {
+        const { id, ...updates } = mutation.payload as any;
+        const { error } = await updateSeason(id, updates);
+        return !error;
+      }
+      case 'delete_season': {
+        const { error } = await deleteSeason(mutation.payload.id as string);
+        return !error;
+      }
+      case 'approve_request': {
+        const { id, comment } = mutation.payload as any;
+        const { error } = await approveRequest(id, comment);
+        return !error;
+      }
+      case 'reject_request': {
+        const { id, comment } = mutation.payload as any;
+        const { error } = await rejectRequest(id, comment);
+        return !error;
+      }
+      case 'create_recurring': {
+        const { error } = await createRecurringTransaction(mutation.payload as any);
+        return !error;
+      }
+      case 'update_recurring': {
+        const { id, ...updates } = mutation.payload as any;
+        const { error } = await updateRecurringTransaction(id, updates);
+        return !error;
+      }
+      case 'delete_recurring': {
+        const { error } = await deleteRecurringTransaction(mutation.payload.id as string);
+        return !error;
+      }
+      case 'upsert_budget_alert': {
+        const { error } = await upsertBudgetAlert(mutation.payload as any);
+        return !error;
+      }
+      case 'delete_budget_alert': {
+        const { error } = await deleteBudgetAlert(mutation.payload.id as string);
+        return !error;
+      }
       default:
-        console.warn(`[SyncManager] Tipo de mutacion desconocido: ${mutation.type}`);
+        if (__DEV__) console.warn(`[SyncManager] Tipo de mutacion desconocido: ${mutation.type}`);
         return false;
     }
   } catch (error) {
-    console.error(`[SyncManager] Error procesando mutacion ${mutation.id}:`, error);
+    if (__DEV__) console.error(`[SyncManager] Error procesando mutacion ${mutation.id}:`, error);
     return false;
   }
 }
@@ -54,14 +122,15 @@ export async function processOfflineQueue(queryClient: QueryClient): Promise<{ p
     return { processed: 0, failed: 0 };
   }
 
-  console.log(`[SyncManager] Procesando ${queue.length} mutaciones pendientes...`);
+  if (__DEV__) console.log(`[SyncManager] Procesando ${queue.length} mutaciones pendientes...`);
 
   let processed = 0;
   let failed = 0;
+  const processedTypes = new Set<string>();
 
   for (const mutation of queue) {
     if (mutation.retryCount >= MAX_RETRIES) {
-      console.warn(`[SyncManager] Mutacion ${mutation.id} excedio max reintentos, descartando`);
+      if (__DEV__) console.warn(`[SyncManager] Mutacion ${mutation.id} excedio max reintentos, descartando`);
       await dequeueMutation(mutation.id);
       failed += 1;
       continue;
@@ -72,17 +141,32 @@ export async function processOfflineQueue(queryClient: QueryClient): Promise<{ p
     if (success) {
       await dequeueMutation(mutation.id);
       processed += 1;
+      processedTypes.add(mutation.type);
     } else {
       await incrementRetryCount(mutation.id);
       failed += 1;
     }
   }
 
-  // Invalidar queries para refrescar datos despues de sincronizar
+  // Invalidar queries relevantes para refrescar datos despues de sincronizar
   if (processed > 0) {
-    await queryClient.invalidateQueries();
+    const keysToInvalidate = new Set<string>();
+    for (const type of processedTypes) {
+      const keys = MUTATION_QUERY_KEYS[type];
+      if (keys) {
+        for (const key of keys) {
+          keysToInvalidate.add(JSON.stringify(key));
+        }
+      }
+    }
+
+    const invalidations = Array.from(keysToInvalidate).map((k) =>
+      queryClient.invalidateQueries({ queryKey: JSON.parse(k) })
+    );
+    await Promise.all(invalidations);
+
     await persistQueryCache(queryClient);
-    console.log(`[SyncManager] Sincronizacion completada: ${processed} exitosas, ${failed} fallidas`);
+    if (__DEV__) console.log(`[SyncManager] Sincronizacion completada: ${processed} exitosas, ${failed} fallidas`);
   }
 
   return { processed, failed };
@@ -105,7 +189,7 @@ export function startSyncListener(queryClient: QueryClient): () => void {
     if (wasDisconnected && isOnline) {
       wasDisconnected = false;
       processOfflineQueue(queryClient).catch((err) => {
-        console.error('[SyncManager] Error en sincronizacion automatica:', err);
+        if (__DEV__) console.error('[SyncManager] Error en sincronizacion automatica:', err);
       });
     }
   });

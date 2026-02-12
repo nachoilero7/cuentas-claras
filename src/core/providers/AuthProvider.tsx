@@ -56,7 +56,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
       } catch (error) {
-        console.error('[Auth] Error al obtener sesion inicial:', error);
+        if (__DEV__) console.error('[Auth] Error al obtener sesion inicial:', error);
       } finally {
         setIsLoading(false);
       }
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
         return { error };
       } catch (error) {
-        console.error('[Auth] Error inesperado en signIn:', error);
+        if (__DEV__) console.error('[Auth] Error inesperado en signIn:', error);
         return { error: error as AuthError };
       }
     },
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const needsConfirmation = !error && !!data.user && !data.session;
         return { error, needsConfirmation };
       } catch (error) {
-        console.error('[Auth] Error inesperado en signUp:', error);
+        if (__DEV__) console.error('[Auth] Error inesperado en signUp:', error);
         return { error: error as AuthError, needsConfirmation: false };
       }
     },
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { error } = await googleSignIn();
       return { error };
     } catch (error) {
-      console.error('[Auth] Error inesperado en signInWithGoogle:', error);
+      if (__DEV__) console.error('[Auth] Error inesperado en signInWithGoogle:', error);
       return { error: error instanceof Error ? error : new Error('Error inesperado') };
     }
   }, []);
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { error } = await supabase.auth.signOut();
       return { error };
     } catch (error) {
-      console.error('[Auth] Error inesperado en signOut:', error);
+      if (__DEV__) console.error('[Auth] Error inesperado en signOut:', error);
       return { error: error as AuthError };
     }
   }, []);
@@ -146,7 +146,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const { error } = await supabase.auth.resetPasswordForEmail(email);
         return { error };
       } catch (error) {
-        console.error('[Auth] Error inesperado en resetPassword:', error);
+        if (__DEV__) console.error('[Auth] Error inesperado en resetPassword:', error);
         return { error: error as AuthError };
       }
     },

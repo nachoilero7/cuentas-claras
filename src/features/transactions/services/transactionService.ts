@@ -41,6 +41,7 @@ export interface TransactionFilters {
   startDate?: string;
   endDate?: string;
   createdBy?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -84,6 +85,11 @@ export async function getTransactions(filters?: TransactionFilters) {
   }
   if (filters?.endDate) {
     query = query.lte('transaction_date', filters.endDate);
+  }
+
+  // Busqueda por descripcion o notas
+  if (filters?.search) {
+    query = query.or(`description.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`);
   }
 
   // Paginacion

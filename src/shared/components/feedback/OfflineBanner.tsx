@@ -3,9 +3,11 @@ import { View, StyleSheet, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNetworkStatus } from '@/src/core/hooks/useNetworkStatus';
+import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { spacing } from '@/src/shared/theme';
 
 export function OfflineBanner() {
+  const { colors } = useAppTheme();
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const isOffline = isConnected === false || isInternetReachable === false;
   const [slideAnim] = useState(() => new Animated.Value(isOffline ? 0 : -50));
@@ -24,7 +26,7 @@ export function OfflineBanner() {
     <Animated.View
       style={[
         styles.container,
-        { transform: [{ translateY: slideAnim }] },
+        { backgroundColor: colors.error, transform: [{ translateY: slideAnim }] },
       ]}
     >
       <View style={styles.content}>
@@ -46,7 +48,6 @@ export function OfflineBanner() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ef4444',
     position: 'absolute',
     top: 0,
     left: 0,

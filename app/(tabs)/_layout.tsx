@@ -5,6 +5,8 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useUnreadCount } from '@/src/features/budget/hooks';
+import type { UserRole } from '@/src/core/types/database';
 
 // ── Tipos para los iconos de tabs ───────────────────────────────────────────
 
@@ -16,6 +18,8 @@ interface TabConfig {
   icon: TabIconName;
   iconFocused: TabIconName;
   adminOnly?: boolean;
+  /** Roles que pueden ver este tab (si no se define, visible para todos) */
+  requiredRoles?: UserRole[];
 }
 
 const TABS: TabConfig[] = [
@@ -46,6 +50,13 @@ const TABS: TabConfig[] = [
     adminOnly: true,
   },
   {
+    name: 'members',
+    title: 'Miembros',
+    icon: 'account-group-outline',
+    iconFocused: 'account-group',
+    requiredRoles: ['admin', 'manager'],
+  },
+  {
     name: 'settings',
     title: 'Ajustes',
     icon: 'cog-outline',
@@ -59,7 +70,20 @@ export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const { colors } = useAppTheme();
   const { data: profile } = useProfile();
+  const { data: unreadCount } = useUnreadCount();
   const isAdmin = profile?.role === 'admin';
+  const userRole = profile?.role;
+
+  // Determinar si un tab debe estar visible segun el rol del usuario
+  const isTabVisible = (tab: TabConfig): boolean => {
+    if (tab.requiredRoles && userRole) {
+      return tab.requiredRoles.includes(userRole);
+    }
+    if (tab.adminOnly) {
+      return isAdmin;
+    }
+    return true;
+  };
 
   // Mostrar un indicador de carga mientras se verifica la sesion
   if (isLoading) {
@@ -114,8 +138,12 @@ export default function TabsLayout() {
                 color={color}
               />
             ),
-            // Ocultar tabs de admin para usuarios no-admin
-            href: tab.adminOnly && !isAdmin ? null : undefined,
+            // Badge de notificaciones no leidas en el tab de Ajustes
+            ...(tab.name === 'settings' && unreadCount && unreadCount > 0
+              ? { tabBarBadge: unreadCount > 99 ? '99+' : unreadCount }
+              : {}),
+            // Ocultar tabs segun el rol del usuario
+            href: isTabVisible(tab) ? undefined : null,
           }}
         />
       ))}

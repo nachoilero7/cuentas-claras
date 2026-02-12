@@ -1,3 +1,5 @@
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
+
 import React, { useCallback, useMemo } from 'react';
 import {
   View,
@@ -24,13 +26,6 @@ import { formatCurrency } from '@/src/core/utils/currency';
 import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing, borderRadius } from '@/src/shared/theme/spacing';
-
-// ── Constantes de colores financieros ─────────────────────────────────────────
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
 
 // ── Formato de fecha actual ────────────────────────────────────────────────────
 function getCurrentDateLabel(): string {
@@ -96,9 +91,11 @@ interface MonthBarProps {
   income: number;
   expenses: number;
   maxValue: number;
+  incomeColor: string;
+  expenseColor: string;
 }
 
-function MonthBar({ label, income, expenses, maxValue }: MonthBarProps) {
+function MonthBar({ label, income, expenses, maxValue, incomeColor, expenseColor }: MonthBarProps) {
   const incomeWidth = maxValue > 0 ? (income / maxValue) * 100 : 0;
   const expenseWidth = maxValue > 0 ? (expenses / maxValue) * 100 : 0;
 
@@ -115,12 +112,12 @@ function MonthBar({ label, income, expenses, maxValue }: MonthBarProps) {
               styles.bar,
               {
                 width: `${Math.max(incomeWidth, 1)}%`,
-                backgroundColor: FINANCIAL_COLORS.income,
+                backgroundColor: incomeColor,
                 opacity: income > 0 ? 1 : 0.2,
               },
             ]}
           />
-          <Text variant="labelSmall" style={[styles.barAmount, { color: FINANCIAL_COLORS.income }]}>
+          <Text variant="labelSmall" style={[styles.barAmount, { color: incomeColor }]}>
             {income > 0 ? formatCurrency(income) : ''}
           </Text>
         </View>
@@ -131,12 +128,12 @@ function MonthBar({ label, income, expenses, maxValue }: MonthBarProps) {
               styles.bar,
               {
                 width: `${Math.max(expenseWidth, 1)}%`,
-                backgroundColor: FINANCIAL_COLORS.expense,
+                backgroundColor: expenseColor,
                 opacity: expenses > 0 ? 1 : 0.2,
               },
             ]}
           />
-          <Text variant="labelSmall" style={[styles.barAmount, { color: FINANCIAL_COLORS.expense }]}>
+          <Text variant="labelSmall" style={[styles.barAmount, { color: expenseColor }]}>
             {expenses > 0 ? formatCurrency(expenses) : ''}
           </Text>
         </View>
@@ -156,6 +153,8 @@ interface CategoryRowProps {
   surfaceColor: string;
   textColor: string;
   secondaryTextColor: string;
+  defaultBarColor: string;
+  onPress?: () => void;
 }
 
 function CategoryRow({
@@ -167,11 +166,18 @@ function CategoryRow({
   surfaceColor,
   textColor,
   secondaryTextColor,
+  defaultBarColor,
+  onPress,
 }: CategoryRowProps) {
-  const barColor = color || FINANCIAL_COLORS.expense;
+  const barColor = color || defaultBarColor;
 
   return (
-    <View style={styles.categoryRow}>
+    <Pressable
+      style={styles.categoryRow}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}: ${formatCurrency(amount)}`}
+    >
       <View style={styles.categoryHeader}>
         <View style={styles.categoryNameRow}>
           {icon ? (
@@ -220,7 +226,7 @@ function CategoryRow({
           ]}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -284,8 +290,8 @@ export default function DashboardScreen() {
   // Balance colores
   const balanceColor =
     (summary?.net_balance_ars ?? 0) >= 0
-      ? FINANCIAL_COLORS.income
-      : FINANCIAL_COLORS.expense;
+      ? colors.income
+      : colors.expense;
 
   // ── Loading state ────────────────────────────────────────────────────────────
   if (summaryLoading && !summary) {
@@ -375,7 +381,7 @@ export default function DashboardScreen() {
             <SummaryCard
               label="Ingresos"
               amount={summary?.total_income_ars ?? 0}
-              color={FINANCIAL_COLORS.income}
+              color={colors.income}
               iconName="trending-up"
               backgroundColor={colors.surface}
               textColor={colors.textSecondary}
@@ -383,7 +389,7 @@ export default function DashboardScreen() {
             <SummaryCard
               label="Egresos"
               amount={summary?.total_expenses_ars ?? 0}
-              color={FINANCIAL_COLORS.expense}
+              color={colors.expense}
               iconName="trending-down"
               backgroundColor={colors.surface}
               textColor={colors.textSecondary}
@@ -414,15 +420,17 @@ export default function DashboardScreen() {
               <Pressable
                 style={[styles.counterChip, { backgroundColor: colors.surface }]}
                 onPress={() => router.push('/approvals')}
+                accessibilityRole="button"
+                accessibilityLabel={`${summary?.pending_approvals} aprobaciones pendientes`}
               >
                 <MaterialCommunityIcons
                   name="clock-outline"
                   size={18}
-                  color="#f59e0b"
+                  color={colors.warning}
                 />
                 <Text
                   variant="labelMedium"
-                  style={{ color: '#f59e0b', marginLeft: spacing.xs, fontWeight: '600' }}
+                  style={{ color: colors.warning, marginLeft: spacing.xs, fontWeight: '600' }}
                 >
                   {summary?.pending_approvals} pendientes
                 </Text>
@@ -450,7 +458,7 @@ export default function DashboardScreen() {
             <View style={styles.legendRow}>
               <View style={styles.legendItem}>
                 <View
-                  style={[styles.legendDot, { backgroundColor: FINANCIAL_COLORS.income }]}
+                  style={[styles.legendDot, { backgroundColor: colors.income }]}
                 />
                 <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
                   Ingresos
@@ -458,7 +466,7 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.legendItem}>
                 <View
-                  style={[styles.legendDot, { backgroundColor: FINANCIAL_COLORS.expense }]}
+                  style={[styles.legendDot, { backgroundColor: colors.expense }]}
                 />
                 <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
                   Egresos
@@ -493,6 +501,8 @@ export default function DashboardScreen() {
                     income={month.income}
                     expenses={month.expenses}
                     maxValue={monthlyMaxValue}
+                    incomeColor={colors.income}
+                    expenseColor={colors.expense}
                   />
                 ))}
               </View>
@@ -541,11 +551,16 @@ export default function DashboardScreen() {
                     name={cat.category_name}
                     amount={cat.total_ars}
                     percentage={categoryTotal > 0 ? (cat.total_ars / categoryTotal) * 100 : 0}
-                    color={cat.color ?? FINANCIAL_COLORS.expense}
+                    color={cat.color ?? colors.expense}
                     icon={cat.icon}
                     surfaceColor={colors.surfaceVariant}
                     textColor={colors.text}
                     secondaryTextColor={colors.textSecondary}
+                    defaultBarColor={colors.expense}
+                    onPress={() => router.push({
+                      pathname: '/(tabs)/transactions',
+                      params: { categoryId: cat.category_id, type: 'expense' },
+                    })}
                   />
                 ))}
               </View>

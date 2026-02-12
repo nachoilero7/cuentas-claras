@@ -1,5 +1,7 @@
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
+
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, Pressable, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Pressable, TextInput } from 'react-native';
 import { Text, Divider, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -7,6 +9,7 @@ import { router } from 'expo-router';
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme, type ThemeMode } from '@/src/core/providers/ThemeProvider';
 import { useProfile, useUpdateProfile } from '@/src/features/auth/hooks/useProfile';
+import { useBiometric, BIOMETRIC_LABELS } from '@/src/features/security';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing } from '@/src/shared/theme';
 import { APP_NAME, APP_VERSION, USER_ROLE_LABELS } from '@/src/core/config/constants';
@@ -17,6 +20,7 @@ export default function SettingsScreen() {
   const { colors, themeMode, setThemeMode } = useAppTheme();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const biometric = useBiometric();
   const [loggingOut, setLoggingOut] = useState(false);
   const [editingAlias, setEditingAlias] = useState(false);
   const [aliasValue, setAliasValue] = useState('');
@@ -72,7 +76,11 @@ export default function SettingsScreen() {
   }, [aliasValue, updateProfile]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {/* ── Tarjeta de perfil ──────────────────────────────────────────── */}
       <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
         <View style={[styles.avatar, { backgroundColor: colors.primaryContainer }]}>
@@ -281,6 +289,68 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* ── Seguridad biometrica ──────────────────────────────────────── */}
+      {biometric.isAvailable && biometric.isEnrolled && (
+        <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+          <View style={styles.themeSectionHeader}>
+            <MaterialCommunityIcons
+              name="fingerprint"
+              size={20}
+              color={colors.primary}
+            />
+            <Text variant="bodyMedium" style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '600' }}>
+              Seguridad
+            </Text>
+          </View>
+          <Divider style={{ backgroundColor: colors.outlineVariant }} />
+          <Pressable
+            style={styles.infoRow}
+            onPress={() => biometric.setEnabled(!biometric.isEnabled)}
+          >
+            <MaterialCommunityIcons
+              name={biometric.isEnabled ? 'shield-check' : 'shield-off-outline'}
+              size={20}
+              color={biometric.isEnabled ? colors.primary : colors.textTertiary}
+            />
+            <View style={styles.infoContent}>
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                {biometric.biometricType
+                  ? BIOMETRIC_LABELS[biometric.biometricType]
+                  : 'Autenticacion biometrica'}
+              </Text>
+              <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                {biometric.isEnabled
+                  ? 'Activa - Se pedira confirmacion para acciones sensibles'
+                  : 'Inactiva - Toca para activar'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.biometricToggle,
+                {
+                  backgroundColor: biometric.isEnabled ? colors.primary : colors.surfaceVariant,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.biometricToggleThumb,
+                  {
+                    backgroundColor: '#fff',
+                    transform: [{ translateX: biometric.isEnabled ? 16 : 0 }],
+                  },
+                ]}
+              />
+            </View>
+          </Pressable>
+          <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.smd }}>
+            <Text variant="bodySmall" style={{ color: colors.textTertiary, lineHeight: 18 }}>
+              Protege operaciones como eliminar transacciones y aprobar/rechazar solicitudes.
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* ── Administracion (solo admin) ──────────────────────────────── */}
       {role === 'admin' && (
         <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
@@ -382,8 +452,32 @@ export default function SettingsScreen() {
         </View>
       )}
 
-      {/* ── Notificaciones (todos los usuarios) ──────────────────────── */}
+      {/* ── Herramientas (todos los usuarios) ──────────────────────── */}
       <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+        <Pressable
+          style={styles.infoRow}
+          onPress={() => router.push('/recurring')}
+        >
+          <MaterialCommunityIcons
+            name="repeat"
+            size={20}
+            color={colors.primary}
+          />
+          <View style={styles.infoContent}>
+            <Text variant="bodyMedium" style={{ color: colors.text }}>
+              Transacciones recurrentes
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Cuotas, suscripciones y pagos periodicos
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={colors.textTertiary}
+          />
+        </Pressable>
+        <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant }} />
         <Pressable
           style={styles.infoRow}
           onPress={() => router.push('/notifications')}
@@ -423,7 +517,7 @@ export default function SettingsScreen() {
           Cerrar Sesion
         </Button>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -461,7 +555,10 @@ function InfoRow({ icon, label, value, colors }: InfoRowProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
     padding: spacing.md,
+    paddingBottom: spacing.xl,
   },
   profileCard: {
     borderRadius: 16,
@@ -553,8 +650,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: 8,
   },
+  biometricToggle: {
+    width: 44,
+    height: 28,
+    borderRadius: 14,
+    padding: 4,
+    justifyContent: 'center',
+  },
+  biometricToggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
   logoutSection: {
-    marginTop: 'auto',
+    marginTop: spacing.md,
     paddingBottom: spacing.md,
   },
 });

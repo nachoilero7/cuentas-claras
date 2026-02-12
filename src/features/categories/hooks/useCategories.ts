@@ -68,6 +68,51 @@ export function useUpdateCategory() {
       if (error) throw error;
       return data;
     },
+    onMutate: async (variables: { id: string } & UpdateCategoryData) => {
+      const { id, ...updates } = variables;
+
+      // Cancelar queries en curso para evitar sobreescribir la actualizacion optimista
+      await queryClient.cancelQueries({ queryKey: ['categories'] });
+      await queryClient.cancelQueries({ queryKey: ['category', id] });
+
+      // Snapshot del estado previo de las listas y del detalle
+      const previousCategories = queryClient.getQueriesData<Category[]>({
+        queryKey: ['categories'],
+      });
+      const previousCategory = queryClient.getQueryData<Category | null>(['category', id]);
+
+      // Actualizar optimistamente en todas las listas cacheadas
+      queryClient.setQueriesData<Category[]>(
+        { queryKey: ['categories'] },
+        (old) =>
+          old?.map((c) =>
+            c.id === id ? { ...c, ...updates, updated_at: new Date().toISOString() } : c,
+          ),
+      );
+
+      // Actualizar optimistamente el detalle individual
+      if (previousCategory) {
+        queryClient.setQueryData<Category | null>(['category', id], {
+          ...previousCategory,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      return { previousCategories, previousCategory, id };
+    },
+    onError: (_err, _variables, context) => {
+      // Rollback: restaurar el estado previo de las listas
+      if (context?.previousCategories) {
+        for (const [queryKey, data] of context.previousCategories) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+      // Rollback: restaurar el detalle individual
+      if (context?.id && context?.previousCategory !== undefined) {
+        queryClient.setQueryData(['category', context.id], context.previousCategory);
+      }
+    },
     onSuccess: (_data, variables) => {
       // Invalidar la lista y el detalle de la categoria actualizada
       queryClient.invalidateQueries({ queryKey: ['categories'] });
@@ -86,6 +131,31 @@ export function useDeleteCategory() {
       const { data, error } = await deleteCategory(id);
       if (error) throw error;
       return data;
+    },
+    onMutate: async (id: string) => {
+      // Cancelar queries en curso para evitar sobreescribir la actualizacion optimista
+      await queryClient.cancelQueries({ queryKey: ['categories'] });
+
+      // Snapshot del estado previo de todas las queries de categorias
+      const previousCategories = queryClient.getQueriesData<Category[]>({
+        queryKey: ['categories'],
+      });
+
+      // Remover optimistamente la categoria de todas las listas cacheadas
+      queryClient.setQueriesData<Category[]>(
+        { queryKey: ['categories'] },
+        (old) => old?.filter((c) => c.id !== id),
+      );
+
+      return { previousCategories };
+    },
+    onError: (_err, _id, context) => {
+      // Rollback: restaurar el estado previo de todas las queries
+      if (context?.previousCategories) {
+        for (const [queryKey, data] of context.previousCategories) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
     },
     onSuccess: () => {
       // Invalidar las listas de categorias para reflejar la eliminacion

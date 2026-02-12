@@ -1,3 +1,4 @@
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
 import { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Text, Chip } from 'react-native-paper';
@@ -6,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
+import { usePersistedState } from '@/src/shared/hooks/usePersistedState';
 import { useReportSummary, useCategoryReport, useTransactionsForExport } from '@/src/features/reports/hooks/useReports';
 import { exportTransactionsToExcel } from '@/src/features/reports/services/exportService';
 import { exportReportToPdf } from '@/src/features/reports/services/exportPdfService';
@@ -17,14 +19,6 @@ import { TRANSACTION_TYPE_LABELS } from '@/src/core/config/constants';
 import type { TransactionType } from '@/src/core/types/database';
 import type { ReportFilters } from '@/src/features/reports/services/reportService';
 import type { ExportTransaction } from '@/src/features/reports/services/exportService';
-
-// ── Colores financieros ─────────────────────────────────────────────────────
-
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
 
 // ── Fechas por defecto (ultimos 30 dias) ────────────────────────────────────
 
@@ -50,6 +44,66 @@ const FILTER_CHIPS: FilterChipItem[] = [
   { key: 'transfer', label: 'Transferencias' },
 ];
 
+// ── Presets de fechas rapidas ───────────────────────────────────────────────
+
+interface DatePreset {
+  key: string;
+  label: string;
+  getRange: () => { start: string; end: string };
+}
+
+const DATE_PRESETS: DatePreset[] = [
+  {
+    key: 'this_month',
+    label: 'Este mes',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return {
+        start: start.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0],
+      };
+    },
+  },
+  {
+    key: 'last_month',
+    label: 'Mes pasado',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0],
+      };
+    },
+  },
+  {
+    key: 'last_3_months',
+    label: 'Ultimos 3 meses',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+      return {
+        start: start.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0],
+      };
+    },
+  },
+  {
+    key: 'this_year',
+    label: 'Este año',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 1);
+      return {
+        start: start.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0],
+      };
+    },
+  },
+];
+
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function ReportsScreen() {
@@ -60,9 +114,10 @@ export default function ReportsScreen() {
   // ── Estado de filtros (editables) ───────────────────────────────────────
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
-  const [typeFilter, setTypeFilter] = useState<TransactionType | undefined>(undefined);
+  const [typeFilter, setTypeFilter] = usePersistedState<TransactionType | undefined>('report-type-filter', undefined);
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>(undefined);
-  const [showFilters, setShowFilters] = useState(true);
+  const [selectedPreset, setSelectedPreset] = usePersistedState<string | undefined>('report-date-preset', undefined);
+  const [showFilters, setShowFilters] = usePersistedState<boolean>('report-show-filters', true);
 
   // ── Filtros aplicados (solo se actualizan al presionar "Aplicar") ──────
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters>({
@@ -96,6 +151,13 @@ export default function ReportsScreen() {
 
   const handleTypeFilterChange = useCallback((key: FilterType) => {
     setTypeFilter(key === 'all' ? undefined : (key as TransactionType));
+  }, []);
+
+  const handlePresetSelect = useCallback((preset: DatePreset) => {
+    const { start, end } = preset.getRange();
+    setStartDate(start);
+    setEndDate(end);
+    setSelectedPreset(preset.key);
   }, []);
 
   const handleCategoryFilterChange = useCallback((catId: string | undefined) => {
@@ -182,8 +244,13 @@ export default function ReportsScreen() {
         payment_method: t.payment_method ?? null,
       }));
 
+      if (!summary) {
+        Alert.alert('Sin resumen', 'Espera a que se cargue el resumen antes de exportar.');
+        return;
+      }
+
       await exportReportToPdf({
-        summary: summary!,
+        summary,
         categoryReport: categoryReport ?? [],
         transactions: exportData,
         filters: {
@@ -203,8 +270,8 @@ export default function ReportsScreen() {
   // ── Balance color dinamico ──────────────────────────────────────────────
   const balanceColor = useMemo(() => {
     if (!summary) return colors.text;
-    if (summary.netBalance > 0) return FINANCIAL_COLORS.income;
-    if (summary.netBalance < 0) return FINANCIAL_COLORS.expense;
+    if (summary.netBalance > 0) return colors.income;
+    if (summary.netBalance < 0) return colors.expense;
     return colors.textSecondary;
   }, [summary, colors]);
 
@@ -247,8 +314,44 @@ export default function ReportsScreen() {
 
         {showFilters && (
           <Card variant="outlined" padding="md" style={{ marginTop: spacing.sm }}>
-            {/* Rango de fechas */}
+            {/* Periodo rapido */}
             <Text variant="labelLarge" style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Periodo rapido
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
+              {DATE_PRESETS.map((preset) => {
+                const isActive = selectedPreset === preset.key;
+                return (
+                  <Chip
+                    key={preset.key}
+                    mode={isActive ? 'flat' : 'outlined'}
+                    selected={isActive}
+                    onPress={() => handlePresetSelect(preset)}
+                    style={[
+                      styles.chip,
+                      isActive
+                        ? { backgroundColor: colors.primary }
+                        : { backgroundColor: colors.surface, borderColor: colors.outline },
+                    ]}
+                    textStyle={[
+                      styles.chipText,
+                      { color: isActive ? colors.onPrimary : colors.textSecondary },
+                    ]}
+                    showSelectedOverlay={false}
+                    showSelectedCheck={false}
+                  >
+                    {preset.label}
+                  </Chip>
+                );
+              })}
+            </ScrollView>
+
+            {/* Rango de fechas */}
+            <Text variant="labelLarge" style={[styles.filterLabel, { color: colors.textSecondary, marginTop: spacing.smd }]}>
               Rango de fechas
             </Text>
             <View style={styles.dateRow}>
@@ -266,7 +369,7 @@ export default function ReportsScreen() {
                     },
                   ]}
                   value={startDate}
-                  onChangeText={setStartDate}
+                  onChangeText={(text) => { setStartDate(text); setSelectedPreset(undefined); }}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={10}
@@ -286,7 +389,7 @@ export default function ReportsScreen() {
                     },
                   ]}
                   value={endDate}
-                  onChangeText={setEndDate}
+                  onChangeText={(text) => { setEndDate(text); setSelectedPreset(undefined); }}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={10}
@@ -310,6 +413,8 @@ export default function ReportsScreen() {
                     mode={isActive ? 'flat' : 'outlined'}
                     selected={isActive}
                     onPress={() => handleTypeFilterChange(chip.key)}
+                    accessibilityLabel={`Filtro tipo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
+                    accessibilityState={{ selected: isActive }}
                     style={[
                       styles.chip,
                       isActive
@@ -444,15 +549,15 @@ export default function ReportsScreen() {
               {/* Ingresos */}
               <Card variant="elevated" padding="sm" style={styles.summaryCard}>
                 <View style={styles.summaryCardContent}>
-                  <View style={[styles.summaryIconBadge, { backgroundColor: FINANCIAL_COLORS.income + '18' }]}>
-                    <MaterialCommunityIcons name="trending-up" size={18} color={FINANCIAL_COLORS.income} />
+                  <View style={[styles.summaryIconBadge, { backgroundColor: colors.income + '18' }]}>
+                    <MaterialCommunityIcons name="trending-up" size={18} color={colors.income} />
                   </View>
                   <Text variant="labelSmall" style={{ color: colors.textSecondary }} numberOfLines={1}>
                     Ingresos
                   </Text>
                   <Text
                     variant="titleSmall"
-                    style={[styles.summaryAmount, { color: FINANCIAL_COLORS.income }]}
+                    style={[styles.summaryAmount, { color: colors.income }]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
@@ -464,15 +569,15 @@ export default function ReportsScreen() {
               {/* Egresos */}
               <Card variant="elevated" padding="sm" style={styles.summaryCard}>
                 <View style={styles.summaryCardContent}>
-                  <View style={[styles.summaryIconBadge, { backgroundColor: FINANCIAL_COLORS.expense + '18' }]}>
-                    <MaterialCommunityIcons name="trending-down" size={18} color={FINANCIAL_COLORS.expense} />
+                  <View style={[styles.summaryIconBadge, { backgroundColor: colors.expense + '18' }]}>
+                    <MaterialCommunityIcons name="trending-down" size={18} color={colors.expense} />
                   </View>
                   <Text variant="labelSmall" style={{ color: colors.textSecondary }} numberOfLines={1}>
                     Egresos
                   </Text>
                   <Text
                     variant="titleSmall"
-                    style={[styles.summaryAmount, { color: FINANCIAL_COLORS.expense }]}
+                    style={[styles.summaryAmount, { color: colors.expense }]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
@@ -547,7 +652,7 @@ export default function ReportsScreen() {
               const catIcon = (item.categoryIcon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'folder';
               const incomeWidth = (item.totalIncome / maxCategoryAmount) * 100;
               const expenseWidth = (item.totalExpenses / maxCategoryAmount) * 100;
-              const balColor = item.netBalance >= 0 ? FINANCIAL_COLORS.income : FINANCIAL_COLORS.expense;
+              const balColor = item.netBalance >= 0 ? colors.income : colors.expense;
 
               return (
                 <View key={item.categoryId}>
@@ -581,7 +686,7 @@ export default function ReportsScreen() {
                     <View style={styles.barsContainer}>
                       {/* Barra de ingresos */}
                       <View style={styles.barRow}>
-                        <Text variant="labelSmall" style={[styles.barLabel, { color: FINANCIAL_COLORS.income }]}>
+                        <Text variant="labelSmall" style={[styles.barLabel, { color: colors.income }]}>
                           Ing.
                         </Text>
                         <View style={[styles.barTrack, { backgroundColor: colors.surfaceVariant }]}>
@@ -589,7 +694,7 @@ export default function ReportsScreen() {
                             style={[
                               styles.barFill,
                               {
-                                backgroundColor: FINANCIAL_COLORS.income,
+                                backgroundColor: colors.income,
                                 width: `${Math.max(incomeWidth, 0)}%`,
                               },
                             ]}
@@ -602,7 +707,7 @@ export default function ReportsScreen() {
 
                       {/* Barra de egresos */}
                       <View style={styles.barRow}>
-                        <Text variant="labelSmall" style={[styles.barLabel, { color: FINANCIAL_COLORS.expense }]}>
+                        <Text variant="labelSmall" style={[styles.barLabel, { color: colors.expense }]}>
                           Egr.
                         </Text>
                         <View style={[styles.barTrack, { backgroundColor: colors.surfaceVariant }]}>
@@ -610,7 +715,7 @@ export default function ReportsScreen() {
                             style={[
                               styles.barFill,
                               {
-                                backgroundColor: FINANCIAL_COLORS.expense,
+                                backgroundColor: colors.expense,
                                 width: `${Math.max(expenseWidth, 0)}%`,
                               },
                             ]}

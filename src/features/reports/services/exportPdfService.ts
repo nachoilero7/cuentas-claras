@@ -2,6 +2,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { lightColorScheme } from '@/src/shared/theme';
 import type { ExportTransaction, ExportFilters } from './exportService';
 import type { CategoryReportItem, ReportSummary } from './reportService';
 
@@ -29,18 +30,18 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 // ── Colores ─────────────────────────────────────────────────────────────────
 
 const COLORS = {
-  primary: '#1B6EF3',
-  primaryLight: '#E8F0FE',
-  income: '#16a34a',
-  incomeBg: '#f0fdf4',
-  expense: '#ef4444',
-  expenseBg: '#fef2f2',
-  transfer: '#3b82f6',
-  text: '#1a1a1a',
-  textSecondary: '#6b7280',
-  border: '#e5e7eb',
-  background: '#f9fafb',
-  white: '#ffffff',
+  primary: lightColorScheme.primary,
+  primaryLight: lightColorScheme.primaryContainer,
+  income: lightColorScheme.income,
+  incomeBg: lightColorScheme.successSurface,
+  expense: lightColorScheme.expense,
+  expenseBg: lightColorScheme.errorSurface,
+  transfer: lightColorScheme.transfer,
+  text: lightColorScheme.text,
+  textSecondary: lightColorScheme.textSecondary,
+  border: lightColorScheme.outline,
+  background: lightColorScheme.background,
+  white: lightColorScheme.surface,
 };
 
 // ── Utilidades ──────────────────────────────────────────────────────────────

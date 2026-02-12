@@ -207,7 +207,7 @@ export default function CategoryFormScreen() {
   const handleDelete = useCallback(() => {
     Alert.alert(
       'Eliminar rubro',
-      'Estas seguro que deseas eliminar este rubro? Esta accion no se puede deshacer.',
+      'El rubro se desactivara y dejara de aparecer en las listas. Las transacciones asociadas se mantendran.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {

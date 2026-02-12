@@ -1,14 +1,18 @@
-import { useState, useCallback, useMemo } from 'react';
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
+import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Pressable,
+  Platform,
 } from 'react-native';
 import { Text, Chip, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -24,14 +28,6 @@ import { TRANSACTION_TYPE_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_ICONS } 
 import { spacing } from '@/src/shared/theme';
 import type { TransactionType, CurrencyCode } from '@/src/core/types/database';
 
-// ── Colores financieros ─────────────────────────────────────────────────────
-
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
-
 // ── Configuracion de iconos por tipo ────────────────────────────────────────
 
 const TYPE_ICONS: Record<TransactionType, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -44,17 +40,64 @@ const TYPE_ICONS: Record<TransactionType, keyof typeof MaterialCommunityIcons.gl
 
 type FilterType = 'all' | TransactionType;
 
-interface FilterChip {
+interface FilterChipItem {
   key: FilterType;
   label: string;
 }
 
-const FILTER_CHIPS: FilterChip[] = [
+const FILTER_CHIPS: FilterChipItem[] = [
   { key: 'all', label: 'Todos' },
   { key: 'income', label: 'Ingresos' },
   { key: 'expense', label: 'Egresos' },
   { key: 'transfer', label: 'Transferencias' },
 ];
+
+// ── Filtros rapidos de fecha ────────────────────────────────────────────────
+
+type DateFilter = 'all' | 'today' | 'week' | 'month' | 'quarter';
+
+interface DateFilterChipItem {
+  key: DateFilter;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}
+
+const DATE_FILTER_CHIPS: DateFilterChipItem[] = [
+  { key: 'all', label: 'Todo', icon: 'calendar-blank' },
+  { key: 'today', label: 'Hoy', icon: 'calendar-today' },
+  { key: 'week', label: 'Semana', icon: 'calendar-week' },
+  { key: 'month', label: 'Mes', icon: 'calendar-month' },
+  { key: 'quarter', label: 'Trimestre', icon: 'calendar-range' },
+];
+
+function getDateRange(filter: DateFilter): { startDate?: string; endDate?: string } {
+  if (filter === 'all') return {};
+
+  const now = new Date();
+  const endDate = now.toISOString().split('T')[0]; // hoy YYYY-MM-DD
+
+  if (filter === 'today') {
+    return { startDate: endDate, endDate };
+  }
+
+  if (filter === 'week') {
+    const start = new Date(now);
+    const dayOfWeek = start.getDay();
+    // Lunes como inicio de semana
+    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    start.setDate(start.getDate() - diff);
+    return { startDate: start.toISOString().split('T')[0], endDate };
+  }
+
+  if (filter === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { startDate: start.toISOString().split('T')[0], endDate };
+  }
+
+  // quarter - ultimos 3 meses
+  const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+  return { startDate: start.toISOString().split('T')[0], endDate };
+}
 
 // ── Componente ──────────────────────────────────────────────────────────────
 
@@ -62,22 +105,50 @@ export default function TransactionsScreen() {
   const { user } = useAuth();
   const { colors } = useAppTheme();
   const { data: profile } = useProfile();
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const params = useLocalSearchParams<{ categoryId?: string; type?: string }>();
+  const [activeFilter, setActiveFilter] = useState<FilterType>(
+    (params.type as FilterType) || 'all'
+  );
+  const [activeCategoryId, setActiveCategoryId] = useState<string | undefined>(
+    params.categoryId || undefined
+  );
+  const [activeDateFilter, setActiveDateFilter] = useState<DateFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce de busqueda: actualizar 300ms despues de dejar de escribir
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const role = profile?.role ?? 'viewer';
   const isAdmin = role === 'admin';
 
-  // Non-admin users only see their own transactions
+  // Usuarios no-admin solo ven sus propias transacciones
   const filters = useMemo(() => {
     const f: Record<string, any> = {};
     if (activeFilter !== 'all') {
       f.type = activeFilter as TransactionType;
     }
+    if (activeCategoryId) {
+      f.categoryId = activeCategoryId;
+    }
     if (!isAdmin && user?.id) {
       f.createdBy = user.id;
     }
+    if (debouncedSearch.trim()) {
+      f.search = debouncedSearch.trim();
+    }
+    // Filtros de fecha
+    const dateRange = getDateRange(activeDateFilter);
+    if (dateRange.startDate) f.startDate = dateRange.startDate;
+    if (dateRange.endDate) f.endDate = dateRange.endDate;
+
     return Object.keys(f).length > 0 ? f : undefined;
-  }, [activeFilter, isAdmin, user?.id]);
+  }, [activeFilter, activeCategoryId, activeDateFilter, isAdmin, user?.id, debouncedSearch]);
 
   const { data: transactions, isLoading, error, refetch } = useTransactions(filters);
 
@@ -95,6 +166,21 @@ export default function TransactionsScreen() {
   const handleNavigateToDetail = useCallback((id: string) => {
     router.push(`/transactions/${id}`);
   }, []);
+
+  const renderTransaction = useCallback(
+    ({ item }: { item: TransactionWithCategory }) => (
+      <TransactionCard
+        transaction={item}
+        colors={colors}
+        onPress={() => handleNavigateToDetail(item.id)}
+      />
+    ),
+    [colors, handleNavigateToDetail],
+  );
+
+  const keyExtractor = useCallback((item: TransactionWithCategory) => item.id, []);
+
+  const ItemSeparator = useCallback(() => <View style={styles.separator} />, []);
 
   // ── Estado de carga ─────────────────────────────────────────────────────
 
@@ -153,6 +239,13 @@ export default function TransactionsScreen() {
             onFilterChange={setActiveFilter}
             colors={colors}
           />
+          <View style={styles.dateChipsRow}>
+            <DateFilterChips
+              activeFilter={activeDateFilter}
+              onFilterChange={setActiveDateFilter}
+              colors={colors}
+            />
+          </View>
         </View>
 
         <EmptyState
@@ -174,6 +267,7 @@ export default function TransactionsScreen() {
             onPress={handleNavigateToNew}
             style={[styles.fab, { backgroundColor: colors.primary }]}
             color={colors.onPrimary}
+            accessibilityLabel="Crear nuevo movimiento"
           />
         )}
       </View>
@@ -186,16 +280,73 @@ export default function TransactionsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        renderItem={renderTransaction}
+        ItemSeparatorComponent={ItemSeparator}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        windowSize={7}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListHeaderComponent={
           <View style={styles.filtersWrapper}>
+            {/* Barra de busqueda */}
+            <View
+              style={[
+                styles.searchContainer,
+                { backgroundColor: colors.surface, borderColor: colors.outline },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="magnify"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Buscar por descripcion..."
+                placeholderTextColor={colors.textTertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCorrect={false}
+                accessibilityLabel="Buscar movimientos"
+              />
+              {searchQuery.length > 0 && (
+                <Pressable
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={8}
+                  accessibilityLabel="Limpiar busqueda"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons
+                    name="close-circle"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </Pressable>
+              )}
+            </View>
+
             <FilterChips
               activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
+              onFilterChange={(f) => { setActiveFilter(f); }}
               colors={colors}
             />
+            <DateFilterChips
+              activeFilter={activeDateFilter}
+              onFilterChange={setActiveDateFilter}
+              colors={colors}
+            />
+            {activeCategoryId && (
+              <Chip
+                icon="tag"
+                onClose={() => setActiveCategoryId(undefined)}
+                style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
+                textStyle={{ fontSize: 12 }}
+              >
+                Filtrando por rubro
+              </Chip>
+            )}
           </View>
         }
         refreshControl={
@@ -206,14 +357,6 @@ export default function TransactionsScreen() {
             tintColor={colors.primary}
           />
         }
-        renderItem={({ item }) => (
-          <TransactionCard
-            transaction={item}
-            colors={colors}
-            onPress={() => handleNavigateToDetail(item.id)}
-          />
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
       {canCreate && (
@@ -223,6 +366,7 @@ export default function TransactionsScreen() {
           onPress={handleNavigateToNew}
           style={[styles.fab, { backgroundColor: colors.primary }]}
           color={colors.onPrimary}
+          accessibilityLabel="Crear nuevo movimiento"
         />
       )}
     </View>
@@ -248,6 +392,51 @@ function FilterChips({ activeFilter, onFilterChange, colors }: FilterChipsProps)
             mode={isActive ? 'flat' : 'outlined'}
             selected={isActive}
             onPress={() => onFilterChange(chip.key)}
+            accessibilityLabel={`Filtro: ${chip.label}${isActive ? ', seleccionado' : ''}`}
+            accessibilityState={{ selected: isActive }}
+            style={[
+              styles.chip,
+              isActive
+                ? { backgroundColor: colors.primary }
+                : { backgroundColor: colors.surface, borderColor: colors.outline },
+            ]}
+            textStyle={[
+              styles.chipText,
+              { color: isActive ? colors.onPrimary : colors.textSecondary },
+            ]}
+            showSelectedOverlay={false}
+            showSelectedCheck={false}
+          >
+            {chip.label}
+          </Chip>
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Filtro de chips de fecha ────────────────────────────────────────────────
+
+interface DateFilterChipsProps {
+  activeFilter: DateFilter;
+  onFilterChange: (filter: DateFilter) => void;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+}
+
+function DateFilterChips({ activeFilter, onFilterChange, colors }: DateFilterChipsProps) {
+  return (
+    <View style={styles.chipsRow}>
+      {DATE_FILTER_CHIPS.map((chip) => {
+        const isActive = activeFilter === chip.key;
+        return (
+          <Chip
+            key={chip.key}
+            mode={isActive ? 'flat' : 'outlined'}
+            selected={isActive}
+            onPress={() => onFilterChange(chip.key)}
+            accessibilityLabel={`Periodo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
+            accessibilityState={{ selected: isActive }}
+            icon={chip.icon}
             style={[
               styles.chip,
               isActive
@@ -277,8 +466,8 @@ interface TransactionCardProps {
   onPress: () => void;
 }
 
-function TransactionCard({ transaction, colors, onPress }: TransactionCardProps) {
-  const typeColor = FINANCIAL_COLORS[transaction.type];
+const TransactionCard = memo(function TransactionCard({ transaction, colors, onPress }: TransactionCardProps) {
+  const typeColor = colors[transaction.type];
   const typeIcon = TYPE_ICONS[transaction.type];
   const categoryColor = transaction.category?.color ?? colors.textTertiary;
   const categoryName = transaction.category?.name ?? 'Sin rubro';
@@ -372,14 +561,14 @@ function TransactionCard({ transaction, colors, onPress }: TransactionCardProps)
           {transaction.status === 'pending' ? (
             <Text
               variant="labelSmall"
-              style={{ color: '#f59e0b', fontWeight: '600', fontSize: 10 }}
+              style={{ color: colors.warning, fontWeight: '600', fontSize: 10 }}
             >
               Pendiente
             </Text>
           ) : transaction.status === 'rejected' ? (
             <Text
               variant="labelSmall"
-              style={{ color: '#ef4444', fontWeight: '600', fontSize: 10 }}
+              style={{ color: colors.error, fontWeight: '600', fontSize: 10 }}
             >
               Rechazada
             </Text>
@@ -402,7 +591,7 @@ function TransactionCard({ transaction, colors, onPress }: TransactionCardProps)
       </View>
     </Card>
   );
-}
+});
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -435,10 +624,27 @@ const styles = StyleSheet.create({
   filtersWrapper: {
     paddingBottom: spacing.sm,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xxs,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  dateChipsRow: {
+    marginTop: spacing.sm,
   },
   chip: {
     borderRadius: 20,

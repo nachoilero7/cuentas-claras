@@ -21,7 +21,7 @@ Notifications.setNotificationHandler({
 export async function registerForPushNotifications(): Promise<string | null> {
   // Solo funciona en dispositivos fisicos
   if (!Device.isDevice) {
-    console.warn('Push notifications solo funcionan en dispositivos fisicos');
+    if (__DEV__) console.warn('Push notifications solo funcionan en dispositivos fisicos');
     return null;
   }
 
@@ -36,7 +36,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (finalStatus !== 'granted') {
-    console.warn('Permisos de notificaciones no otorgados');
+    if (__DEV__) console.warn('Permisos de notificaciones no otorgados');
     return null;
   }
 
@@ -70,7 +70,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
     return tokenData.data;
   } catch (error) {
-    console.error('Error obteniendo push token:', error);
+    if (__DEV__) console.error('Error obteniendo push token:', error);
     return null;
   }
 }
@@ -201,7 +201,7 @@ async function sendExpoPush(
       body: JSON.stringify(messages),
     });
   } catch (error) {
-    console.error('[Push] Error enviando push notifications:', error);
+    if (__DEV__) console.error('[Push] Error enviando push notifications:', error);
   }
 }
 

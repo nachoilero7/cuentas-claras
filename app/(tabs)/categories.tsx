@@ -1,3 +1,5 @@
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
+
 import { useCallback } from 'react';
 import {
   View,

@@ -6,7 +6,7 @@ const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
 
 export function initSentry() {
   if (!SENTRY_DSN) {
-    console.warn('Sentry DSN no configurado. Error tracking desactivado.');
+    if (__DEV__) console.warn('Sentry DSN no configurado. Error tracking desactivado.');
     return;
   }
 

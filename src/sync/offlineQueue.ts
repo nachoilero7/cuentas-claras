@@ -6,7 +6,13 @@ const QUEUE_KEY = 'cuentas-claras-offline-queue';
 
 export interface OfflineMutation {
   id: string;
-  type: 'create_transaction' | 'update_transaction' | 'delete_transaction' | 'create_category' | 'update_category';
+  type:
+    | 'create_transaction' | 'update_transaction' | 'delete_transaction'
+    | 'create_category' | 'update_category'
+    | 'create_season' | 'update_season' | 'delete_season'
+    | 'approve_request' | 'reject_request'
+    | 'create_recurring' | 'update_recurring' | 'delete_recurring'
+    | 'upsert_budget_alert' | 'delete_budget_alert';
   payload: Record<string, unknown>;
   createdAt: string;
   retryCount: number;
@@ -19,7 +25,7 @@ export async function getOfflineQueue(): Promise<OfflineMutation[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch (error) {
-    console.warn('[OfflineQueue] Error al leer cola:', error);
+    if (__DEV__) console.warn('[OfflineQueue] Error al leer cola:', error);
     return [];
   }
 }
