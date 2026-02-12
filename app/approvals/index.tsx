@@ -339,7 +339,7 @@ export default function ApprovalsListScreen() {
                 loading={approveMutation.isPending}
                 disabled={approveMutation.isPending || rejectMutation.isPending}
                 style={{ ...styles.approveButton, backgroundColor: colors.income, borderColor: colors.income }}
-                labelStyle={{ color: '#ffffff' }}
+                labelStyle={{ color: colors.surface }}
               >
                 Aprobar
               </Button>
@@ -549,7 +549,7 @@ export default function ApprovalsListScreen() {
               onPress={confirmReject}
               loading={rejectMutation.isPending}
               style={{ flex: 1, backgroundColor: colors.expense, borderColor: colors.expense }}
-              labelStyle={{ color: '#ffffff' }}
+              labelStyle={{ color: colors.surface }}
             >
               Rechazar
             </Button>

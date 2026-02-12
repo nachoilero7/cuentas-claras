@@ -4,8 +4,6 @@ export {
   createTransaction,
   updateTransaction,
   deleteTransaction,
-  approveTransaction,
-  rejectTransaction,
 } from './transactionService';
 
 export type {

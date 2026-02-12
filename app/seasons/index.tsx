@@ -173,7 +173,7 @@ export default function SeasonsListScreen() {
                 {item.name}
               </Text>
               {item.is_current && (
-                <View style={styles.currentBadge}>
+                <View style={[styles.currentBadge, { backgroundColor: colors.warningSurface }]}>
                   <MaterialCommunityIcons
                     name="star"
                     size={14}
@@ -320,7 +320,6 @@ const styles = StyleSheet.create({
   currentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef3c7',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: 12,

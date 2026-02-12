@@ -336,7 +336,7 @@ export default function SettingsScreen() {
                 style={[
                   styles.biometricToggleThumb,
                   {
-                    backgroundColor: '#fff',
+                    backgroundColor: colors.surface,
                     transform: [{ translateX: biometric.isEnabled ? 16 : 0 }],
                   },
                 ]}

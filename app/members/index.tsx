@@ -301,7 +301,7 @@ export default function MembersDirectoryScreen() {
             autoCorrect={false}
           />
           {search.length > 0 && (
-            <Pressable onPress={() => setSearch('')} hitSlop={8}>
+            <Pressable onPress={() => setSearch('')} hitSlop={8} accessibilityLabel="Limpiar búsqueda">
               <MaterialCommunityIcons
                 name="close-circle"
                 size={18}

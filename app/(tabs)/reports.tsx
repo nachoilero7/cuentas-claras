@@ -373,6 +373,7 @@ export default function ReportsScreen() {
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={10}
+                  keyboardType="number-pad"
                 />
               </View>
               <View style={styles.dateInputWrapper}>
@@ -393,6 +394,7 @@ export default function ReportsScreen() {
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={10}
+                  keyboardType="number-pad"
                 />
               </View>
             </View>

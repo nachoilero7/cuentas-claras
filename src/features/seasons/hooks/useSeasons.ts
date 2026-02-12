@@ -106,6 +106,11 @@ export function useSetCurrentSeason() {
       // Invalidar temporadas y la temporada actual para reflejar el cambio
       queryClient.invalidateQueries({ queryKey: ['seasons'] });
       queryClient.invalidateQueries({ queryKey: ['current-season'] });
+      // Invalidar todos los datos que dependen de la temporada activa
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['recurring'] });
     },
   });
 }

@@ -43,7 +43,7 @@ const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
 
 export default function RecurringListScreen() {
   const { colors } = useAppTheme();
-  const { data: items, isLoading, refetch } = useRecurringTransactions();
+  const { data: items, isLoading, isRefetching, refetch } = useRecurringTransactions();
   const toggleMutation = useToggleRecurring();
   const deleteMutation = useDeleteRecurring();
   const { authenticate } = useBiometric();
@@ -80,6 +80,12 @@ export default function RecurringListScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text
+          variant="bodyMedium"
+          style={{ color: colors.textSecondary, marginTop: spacing.sm }}
+        >
+          Cargando recurrentes...
+        </Text>
       </View>
     );
   }
@@ -107,7 +113,7 @@ export default function RecurringListScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
+            refreshing={isRefetching}
             onRefresh={refetch}
             colors={[colors.primary]}
             tintColor={colors.primary}

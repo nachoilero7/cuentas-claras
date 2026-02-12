@@ -29,7 +29,7 @@ function getRoleBadgeColors(
 ) {
   switch (role) {
     case 'admin':
-      return { background: colors.error, text: '#ffffff' };
+      return { background: colors.error, text: colors.onPrimary };
     case 'manager':
       return { background: colors.primary, text: colors.onPrimary };
     case 'viewer':
@@ -259,6 +259,7 @@ export default function UsersListScreen() {
               size={18}
               color={colors.textTertiary}
               onPress={() => setSearchQuery('')}
+              accessibilityLabel="Limpiar búsqueda"
             />
           )}
         </View>

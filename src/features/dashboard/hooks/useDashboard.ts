@@ -20,7 +20,7 @@ const FIVE_MINUTES = 1000 * 60 * 5;
 
 export function useDashboardSummary(seasonId?: string) {
   return useQuery<DashboardSummary | null>({
-    queryKey: ['dashboard', 'summary', seasonId],
+    queryKey: ['dashboard', 'summary', seasonId ?? 'all'],
     queryFn: async () => {
       const { data, error } = await getDashboardSummary(seasonId);
       if (error) throw error;
@@ -34,7 +34,7 @@ export function useDashboardSummary(seasonId?: string) {
 
 export function useMonthlyBreakdown(seasonId?: string, months?: number) {
   return useQuery<MonthlyBreakdown[]>({
-    queryKey: ['dashboard', 'monthly', seasonId, months],
+    queryKey: ['dashboard', 'monthly', seasonId ?? 'all', months ?? 6],
     queryFn: async () => {
       const { data, error } = await getMonthlyBreakdown(seasonId, months);
       if (error) throw error;
@@ -48,7 +48,14 @@ export function useMonthlyBreakdown(seasonId?: string, months?: number) {
 
 export function useCategoryBreakdown(params?: CategoryBreakdownParams) {
   return useQuery<CategoryBreakdown[]>({
-    queryKey: ['dashboard', 'category-breakdown', params],
+    queryKey: [
+      'dashboard',
+      'category-breakdown',
+      params?.seasonId ?? 'all',
+      params?.type ?? 'expense',
+      params?.startDate ?? 'none',
+      params?.endDate ?? 'none',
+    ],
     queryFn: async () => {
       const { data, error } = await getCategoryBreakdown(params);
       if (error) throw error;
@@ -62,7 +69,7 @@ export function useCategoryBreakdown(params?: CategoryBreakdownParams) {
 
 export function useCategoryBalances(seasonId?: string) {
   return useQuery<CategoryBalance[]>({
-    queryKey: ['dashboard', 'balances', seasonId],
+    queryKey: ['dashboard', 'balances', seasonId ?? 'all'],
     queryFn: async () => {
       const { data, error } = await getCategoryBalances(seasonId);
       if (error) throw error;
