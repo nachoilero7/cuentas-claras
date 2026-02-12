@@ -30,10 +30,10 @@ import type { BudgetStatus } from '@/src/features/budget/services/budgetAlertSer
 
 // ── Colores de progreso ─────────────────────────────────────────────────────
 
-function getProgressColor(percentageUsed: number, threshold: number): string {
-  if (percentageUsed >= threshold) return '#ef4444'; // rojo
-  if (percentageUsed >= 50) return '#f59e0b'; // amarillo
-  return '#16a34a'; // verde
+function getProgressColor(percentageUsed: number, threshold: number, colors: { error: string; warning: string; success: string }): string {
+  if (percentageUsed >= threshold) return colors.error;
+  if (percentageUsed >= 50) return colors.warning;
+  return colors.success;
 }
 
 // ── Componente de barra de progreso ─────────────────────────────────────────
@@ -270,7 +270,7 @@ export default function BudgetAlertsScreen() {
     const status = statusMap.get(alert.category_id);
     if (!status) return null;
 
-    const progressColor = getProgressColor(status.percentage_used, status.threshold_percentage);
+    const progressColor = getProgressColor(status.percentage_used, status.threshold_percentage, colors);
     const iconName = (alert.category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'tag-outline';
 
     return (

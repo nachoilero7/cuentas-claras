@@ -65,3 +65,17 @@ export function formatRelative(date: Date | string | number): string {
     locale: es,
   });
 }
+
+/**
+ * Convierte un objeto Date a string ISO (YYYY-MM-DD) usando la fecha local.
+ * Util para enviar fechas a Supabase sin componente horario.
+ *
+ * @example
+ * dateToISO(new Date(2026, 1, 12)) // "2026-02-12"
+ */
+export function dateToISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

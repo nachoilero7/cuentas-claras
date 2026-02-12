@@ -46,7 +46,7 @@ export async function uploadAttachment(
     .from('receipts')
     .upload(filePath, arrayBuffer, {
       contentType: mimeType,
-      upsert: false,
+      upsert: true,
     });
 
   if (uploadError) {

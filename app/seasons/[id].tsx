@@ -27,6 +27,8 @@ import {
 } from '@/src/features/seasons/hooks/useSeasons';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
+import { DatePickerInput } from '@/src/shared/components/ui/DatePickerInput';
+import { dateToISO } from '@/src/core/utils/date';
 import { spacing } from '@/src/shared/theme';
 import type { SeasonStatus } from '@/src/core/types/database';
 
@@ -35,77 +37,18 @@ import type { SeasonStatus } from '@/src/core/types/database';
 const seasonSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   description: z.string().nullable().optional(),
-  start_date: z
-    .string()
-    .min(1, 'La fecha de inicio es obligatoria')
-    .refine(
-      (val) => {
-        const parts = val.split('/');
-        if (parts.length !== 3) return false;
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const year = parseInt(parts[2], 10);
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
-        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return false;
-        const date = new Date(year, month - 1, day);
-        return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
-      },
-      { message: 'Ingresa una fecha valida en formato DD/MM/AAAA' }
-    ),
-  end_date: z
-    .string()
-    .nullable()
-    .optional()
-    .refine(
-      (val) => {
-        if (!val || val.trim() === '') return true;
-        const parts = val.split('/');
-        if (parts.length !== 3) return false;
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const year = parseInt(parts[2], 10);
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
-        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return false;
-        const date = new Date(year, month - 1, day);
-        return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
-      },
-      { message: 'Ingresa una fecha valida en formato DD/MM/AAAA' }
-    ),
+  start_date: z.string().min(1, 'La fecha de inicio es obligatoria'),
+  end_date: z.string().nullable().optional(),
   status: z.enum(['active', 'closed', 'planning']),
 });
 
 // ── Configuracion de estados ────────────────────────────────────────────────
 
-const STATUS_OPTIONS: { value: SeasonStatus; label: string; icon: string; color: string }[] = [
-  { value: 'active', label: 'Activa', icon: 'play-circle', color: '#16a34a' },
-  { value: 'planning', label: 'Planificacion', icon: 'calendar-clock', color: '#3b82f6' },
-  { value: 'closed', label: 'Cerrada', icon: 'lock', color: '#6b7280' },
+const STATUS_OPTIONS: { value: SeasonStatus; label: string; icon: string; colorKey: 'success' | 'info' | 'textSecondary' }[] = [
+  { value: 'active', label: 'Activa', icon: 'play-circle', colorKey: 'success' },
+  { value: 'planning', label: 'Planificacion', icon: 'calendar-clock', colorKey: 'info' },
+  { value: 'closed', label: 'Cerrada', icon: 'lock', colorKey: 'textSecondary' },
 ];
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function parseDateToISO(dateStr: string): string {
-  const parts = dateStr.split('/');
-  const day = parts[0].padStart(2, '0');
-  const month = parts[1].padStart(2, '0');
-  const year = parts[2];
-  return `${year}-${month}-${day}`;
-}
-
-function formatISOToDisplay(isoDate: string): string {
-  if (!isoDate) return '';
-  const parts = isoDate.split('T')[0].split('-');
-  if (parts.length !== 3) return isoDate;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
-function getTodayFormatted(): string {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear();
-  return `${day}/${month}/${year}`;
-}
 
 // ── Componente ──────────────────────────────────────────────────────────────
 
@@ -132,8 +75,8 @@ export default function SeasonFormScreen() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState(getTodayFormatted());
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [status, setStatus] = useState<SeasonStatus>('planning');
   const [isCurrent, setIsCurrent] = useState(false);
 
@@ -147,8 +90,12 @@ export default function SeasonFormScreen() {
     if (!isCreateMode && season) {
       setName(season.name ?? '');
       setDescription(season.description ?? '');
-      setStartDate(season.start_date ? formatISOToDisplay(season.start_date) : '');
-      setEndDate(season.end_date ? formatISOToDisplay(season.end_date) : '');
+      setStartDate(
+        season.start_date ? new Date(season.start_date + 'T12:00:00') : new Date()
+      );
+      setEndDate(
+        season.end_date ? new Date(season.end_date + 'T12:00:00') : null
+      );
       setStatus(season.status ?? 'planning');
       setIsCurrent(season.is_current ?? false);
     }
@@ -157,11 +104,14 @@ export default function SeasonFormScreen() {
   // ── Validacion ────────────────────────────────────────────────────────────
 
   const validate = useCallback((): boolean => {
+    const startISO = dateToISO(startDate);
+    const endISO = endDate ? dateToISO(endDate) : null;
+
     const result = seasonSchema.safeParse({
       name: name.trim(),
       description: description.trim() || null,
-      start_date: startDate.trim(),
-      end_date: endDate.trim() || null,
+      start_date: startISO,
+      end_date: endISO,
       status,
     });
 
@@ -178,13 +128,9 @@ export default function SeasonFormScreen() {
     }
 
     // Validacion adicional: fecha fin posterior a fecha inicio
-    if (startDate.trim() && endDate.trim()) {
-      const startISO = parseDateToISO(startDate.trim());
-      const endISO = parseDateToISO(endDate.trim());
-      if (endISO < startISO) {
-        setErrors({ end_date: 'La fecha de fin debe ser posterior a la fecha de inicio' });
-        return false;
-      }
+    if (endISO && endISO < startISO) {
+      setErrors({ end_date: 'La fecha de fin debe ser posterior a la fecha de inicio' });
+      return false;
     }
 
     setErrors({});
@@ -199,8 +145,8 @@ export default function SeasonFormScreen() {
     const payload = {
       name: name.trim(),
       description: description.trim() || null,
-      start_date: parseDateToISO(startDate.trim()),
-      end_date: endDate.trim() ? parseDateToISO(endDate.trim()) : null,
+      start_date: dateToISO(startDate),
+      end_date: endDate ? dateToISO(endDate) : null,
       status,
     };
 
@@ -358,29 +304,21 @@ export default function SeasonFormScreen() {
             />
 
             {/* ── Fecha de inicio ──────────────────────────────────────────────── */}
-            <Input
+            <DatePickerInput
               label="Fecha de inicio *"
               value={startDate}
-              onChangeText={setStartDate}
-              placeholder="DD/MM/AAAA"
-              leftIcon="calendar"
+              onChange={setStartDate}
               error={errors.start_date}
-              helperText="Formato: DD/MM/AAAA"
-              keyboardType="default"
-              maxLength={10}
             />
 
             {/* ── Fecha de fin ─────────────────────────────────────────────────── */}
-            <Input
+            <DatePickerInput
               label="Fecha de fin"
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="DD/MM/AAAA (opcional)"
-              leftIcon="calendar-end"
+              value={endDate ?? startDate}
+              onChange={setEndDate}
+              minimumDate={startDate}
               error={errors.end_date}
-              helperText="Dejar vacio si la temporada aun no finaliza"
-              keyboardType="default"
-              maxLength={10}
+              helperText={!endDate ? 'Toca para establecer fecha de fin' : undefined}
             />
 
             {/* ── Selector de estado ───────────────────────────────────────────── */}
@@ -400,8 +338,8 @@ export default function SeasonFormScreen() {
                       style={[
                         styles.statusCard,
                         {
-                          borderColor: isSelected ? option.color : colors.outlineVariant,
-                          backgroundColor: isSelected ? option.color + '1A' : colors.surfaceVariant,
+                          borderColor: isSelected ? colors[option.colorKey] : colors.outlineVariant,
+                          backgroundColor: isSelected ? colors[option.colorKey] + '1A' : colors.surfaceVariant,
                           borderWidth: isSelected ? 2 : 1,
                         },
                       ]}
@@ -410,12 +348,12 @@ export default function SeasonFormScreen() {
                       <MaterialCommunityIcons
                         name={option.icon as keyof typeof MaterialCommunityIcons.glyphMap}
                         size={24}
-                        color={isSelected ? option.color : colors.textTertiary}
+                        color={isSelected ? colors[option.colorKey] : colors.textTertiary}
                       />
                       <Text
                         variant="labelSmall"
                         style={{
-                          color: isSelected ? option.color : colors.textSecondary,
+                          color: isSelected ? colors[option.colorKey] : colors.textSecondary,
                           marginTop: spacing.xxs,
                           fontWeight: isSelected ? '700' : '500',
                           textAlign: 'center',
@@ -441,7 +379,7 @@ export default function SeasonFormScreen() {
                   <MaterialCommunityIcons
                     name="star-outline"
                     size={20}
-                    color={isCurrent ? '#f59e0b' : colors.text}
+                    color={isCurrent ? colors.warning : colors.text}
                   />
                   <Text
                     variant="bodyMedium"

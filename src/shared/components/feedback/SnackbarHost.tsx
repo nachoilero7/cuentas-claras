@@ -31,7 +31,7 @@ export function SnackbarHost() {
     message.type === 'error'
       ? colors.error
       : message.type === 'success'
-        ? '#16a34a'
+        ? colors.success
         : colors.primary;
 
   return (

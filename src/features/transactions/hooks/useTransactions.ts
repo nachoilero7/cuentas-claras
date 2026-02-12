@@ -125,6 +125,31 @@ export function useDeleteTransaction() {
       if (queued) return null;
       return result;
     },
+    onMutate: async (id: string) => {
+      // Cancelar queries en curso para evitar sobreescribir la actualizacion optimista
+      await queryClient.cancelQueries({ queryKey: ['transactions'] });
+
+      // Snapshot del estado previo de todas las queries de transacciones
+      const previousTransactions = queryClient.getQueriesData<TransactionWithCategory[]>({
+        queryKey: ['transactions'],
+      });
+
+      // Remover optimistamente la transaccion de todas las listas cacheadas
+      queryClient.setQueriesData<TransactionWithCategory[]>(
+        { queryKey: ['transactions'] },
+        (old) => old?.filter((t) => t.id !== id),
+      );
+
+      return { previousTransactions };
+    },
+    onError: (_err, _id, context) => {
+      // Rollback: restaurar el estado previo de todas las queries
+      if (context?.previousTransactions) {
+        for (const [queryKey, data] of context.previousTransactions) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },

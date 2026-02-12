@@ -70,7 +70,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
 
     return { error: null };
   } catch (error) {
-    console.error('[GoogleAuth] Error inesperado:', error);
+    if (__DEV__) console.error('[GoogleAuth] Error inesperado:', error);
     return {
       error: error instanceof Error ? error : new Error('Error inesperado al iniciar sesion con Google'),
     };

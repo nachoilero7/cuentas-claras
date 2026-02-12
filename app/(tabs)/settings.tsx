@@ -1,3 +1,5 @@
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
+
 import { useCallback, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Pressable, TextInput } from 'react-native';
 import { Text, Divider, ActivityIndicator } from 'react-native-paper';

@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { getQueueSize } from '@/src/sync';
+import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { spacing } from '@/src/shared/theme';
 
 /**
@@ -11,6 +12,7 @@ import { spacing } from '@/src/shared/theme';
  * Se refresca cada 10 segundos.
  */
 export function OfflineQueueIndicator() {
+  const { colors } = useAppTheme();
   const [queueSize, setQueueSize] = useState(0);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function OfflineQueueIndicator() {
   if (queueSize === 0) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.warning }]}>
       <MaterialCommunityIcons name="cloud-sync-outline" size={16} color="#fff" />
       <Text variant="labelSmall" style={styles.text}>
         {queueSize} {queueSize === 1 ? 'cambio pendiente' : 'cambios pendientes'} de sincronizar
@@ -46,7 +48,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f59e0b',
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.smd,
     gap: spacing.xs,

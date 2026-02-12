@@ -81,11 +81,11 @@ function getNotificationIconColor(type: string, colors: ReturnType<typeof useApp
     case 'approval':
       return colors.info;
     case 'approval_approved':
-      return '#16a34a';
+      return colors.success;
     case 'approval_rejected':
       return colors.error;
     case 'transaction':
-      return '#3b82f6';
+      return colors.info;
     case 'role_change':
       return colors.primary;
     case 'system':

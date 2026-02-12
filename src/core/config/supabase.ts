@@ -49,7 +49,7 @@ const PLACEHOLDER_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
 const resolvedUrl = supabaseUrl || PLACEHOLDER_URL;
 const resolvedKey = supabaseAnonKey || PLACEHOLDER_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (__DEV__ && (!supabaseUrl || !supabaseAnonKey)) {
   console.warn(
     '[Cuentas Claras] Faltan las variables de entorno EXPO_PUBLIC_SUPABASE_URL y/o EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
       'Crea un archivo .env basado en .env.example para conectar con Supabase.'

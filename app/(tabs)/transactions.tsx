@@ -1,3 +1,4 @@
+export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
 import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import {
   View,
@@ -26,14 +27,6 @@ import { formatDate } from '@/src/core/utils/date';
 import { TRANSACTION_TYPE_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_ICONS } from '@/src/core/config/constants';
 import { spacing } from '@/src/shared/theme';
 import type { TransactionType, CurrencyCode } from '@/src/core/types/database';
-
-// ── Colores financieros ─────────────────────────────────────────────────────
-
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
 
 // ── Configuracion de iconos por tipo ────────────────────────────────────────
 
@@ -399,6 +392,8 @@ function FilterChips({ activeFilter, onFilterChange, colors }: FilterChipsProps)
             mode={isActive ? 'flat' : 'outlined'}
             selected={isActive}
             onPress={() => onFilterChange(chip.key)}
+            accessibilityLabel={`Filtro: ${chip.label}${isActive ? ', seleccionado' : ''}`}
+            accessibilityState={{ selected: isActive }}
             style={[
               styles.chip,
               isActive
@@ -439,6 +434,8 @@ function DateFilterChips({ activeFilter, onFilterChange, colors }: DateFilterChi
             mode={isActive ? 'flat' : 'outlined'}
             selected={isActive}
             onPress={() => onFilterChange(chip.key)}
+            accessibilityLabel={`Periodo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
+            accessibilityState={{ selected: isActive }}
             icon={chip.icon}
             style={[
               styles.chip,
@@ -470,7 +467,7 @@ interface TransactionCardProps {
 }
 
 const TransactionCard = memo(function TransactionCard({ transaction, colors, onPress }: TransactionCardProps) {
-  const typeColor = FINANCIAL_COLORS[transaction.type];
+  const typeColor = colors[transaction.type];
   const typeIcon = TYPE_ICONS[transaction.type];
   const categoryColor = transaction.category?.color ?? colors.textTertiary;
   const categoryName = transaction.category?.name ?? 'Sin rubro';
@@ -564,14 +561,14 @@ const TransactionCard = memo(function TransactionCard({ transaction, colors, onP
           {transaction.status === 'pending' ? (
             <Text
               variant="labelSmall"
-              style={{ color: '#f59e0b', fontWeight: '600', fontSize: 10 }}
+              style={{ color: colors.warning, fontWeight: '600', fontSize: 10 }}
             >
               Pendiente
             </Text>
           ) : transaction.status === 'rejected' ? (
             <Text
               variant="labelSmall"
-              style={{ color: '#ef4444', fontWeight: '600', fontSize: 10 }}
+              style={{ color: colors.error, fontWeight: '600', fontSize: 10 }}
             >
               Rechazada
             </Text>

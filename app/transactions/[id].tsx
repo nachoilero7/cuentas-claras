@@ -42,14 +42,6 @@ import { useBiometric } from '@/src/features/security';
 import { spacing } from '@/src/shared/theme';
 import type { TransactionType, CurrencyCode, PaymentMethod } from '@/src/core/types/database';
 
-// ── Colores financieros ─────────────────────────────────────────────────────
-
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
-
 // ── Configuracion de tipos ──────────────────────────────────────────────────
 
 interface TypeOption {
@@ -59,10 +51,10 @@ interface TypeOption {
   color: string;
 }
 
-const TYPE_OPTIONS: TypeOption[] = [
-  { key: 'income', label: 'Ingreso', icon: 'trending-up', color: FINANCIAL_COLORS.income },
-  { key: 'expense', label: 'Egreso', icon: 'trending-down', color: FINANCIAL_COLORS.expense },
-  { key: 'transfer', label: 'Transferencia', icon: 'swap-horizontal', color: FINANCIAL_COLORS.transfer },
+const TYPE_OPTIONS_BASE: Omit<TypeOption, 'color'>[] = [
+  { key: 'income', label: 'Ingreso', icon: 'trending-up' },
+  { key: 'expense', label: 'Egreso', icon: 'trending-down' },
+  { key: 'transfer', label: 'Transferencia', icon: 'swap-horizontal' },
 ];
 
 const CURRENCY_OPTIONS: CurrencyCode[] = ['ARS', 'USD'];
@@ -126,6 +118,12 @@ export default function TransactionFormScreen() {
   const isCreateMode = id === 'new';
   const role = profile?.role ?? 'viewer';
   const isAdmin = role === 'admin';
+
+  // Opciones de tipo con colores del tema
+  const TYPE_OPTIONS = useMemo(() => TYPE_OPTIONS_BASE.map((opt) => ({
+    ...opt,
+    color: colors[opt.key as 'income' | 'expense' | 'transfer'],
+  })), [colors]);
 
   // Hooks de datos
   const { data: transaction, isLoading: isTransactionLoading } = useTransaction(
@@ -533,18 +531,18 @@ export default function TransactionFormScreen() {
                   <View
                     style={[
                       styles.typeIconSmall,
-                      { backgroundColor: FINANCIAL_COLORS[type] + '18' },
+                      { backgroundColor: colors[type as 'income' | 'expense' | 'transfer'] + '18' },
                     ]}
                   >
                     <MaterialCommunityIcons
                       name={TYPE_OPTIONS.find((o) => o.key === type)?.icon ?? 'help'}
                       size={20}
-                      color={FINANCIAL_COLORS[type]}
+                      color={colors[type as 'income' | 'expense' | 'transfer']}
                     />
                   </View>
                   <Text
                     variant="titleSmall"
-                    style={{ color: FINANCIAL_COLORS[type], fontWeight: '600' }}
+                    style={{ color: colors[type as 'income' | 'expense' | 'transfer'], fontWeight: '600' }}
                   >
                     {TRANSACTION_TYPE_LABELS[type]}
                   </Text>
@@ -811,11 +809,11 @@ export default function TransactionFormScreen() {
 
             {/* ── Nota de aprobacion para usuarios no-admin ────────── */}
             {isCreateMode && !isAdmin && (
-              <View style={[styles.approvalNote, { backgroundColor: '#f59e0b' + '15' }]}>
-                <MaterialCommunityIcons name="information-outline" size={18} color="#f59e0b" />
+              <View style={[styles.approvalNote, { backgroundColor: colors.warning + '15' }]}>
+                <MaterialCommunityIcons name="information-outline" size={18} color={colors.warning} />
                 <Text
                   variant="bodySmall"
-                  style={{ color: '#f59e0b', flex: 1, marginLeft: spacing.sm }}
+                  style={{ color: colors.warning, flex: 1, marginLeft: spacing.sm }}
                 >
                   Tu movimiento sera enviado para aprobacion de un administrador antes de registrarse.
                 </Text>

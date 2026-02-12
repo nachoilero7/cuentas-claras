@@ -24,12 +24,6 @@ import type { RecurrenceFrequency, TransactionType } from '@/src/core/types/data
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
-const FINANCIAL_COLORS = {
-  income: '#16a34a',
-  expense: '#ef4444',
-  transfer: '#3b82f6',
-} as const;
-
 const TYPE_ICONS: Record<TransactionType, keyof typeof MaterialCommunityIcons.glyphMap> = {
   income: 'trending-up',
   expense: 'trending-down',
@@ -153,7 +147,7 @@ interface RecurringCardProps {
 }
 
 function RecurringCard({ item, colors, onToggle, onDelete, onEdit }: RecurringCardProps) {
-  const typeColor = FINANCIAL_COLORS[item.type];
+  const typeColor = colors[item.type as 'income' | 'expense' | 'transfer'];
   const typeIcon = TYPE_ICONS[item.type];
   const nextDate = new Date(item.next_execution);
   const formattedDate = `${nextDate.getDate().toString().padStart(2, '0')}/${(nextDate.getMonth() + 1).toString().padStart(2, '0')}/${nextDate.getFullYear()}`;
@@ -205,7 +199,7 @@ function RecurringCard({ item, colors, onToggle, onDelete, onEdit }: RecurringCa
             <MaterialCommunityIcons
               name={item.is_active ? 'pause-circle-outline' : 'play-circle-outline'}
               size={22}
-              color={item.is_active ? '#f59e0b' : colors.primary}
+              color={item.is_active ? colors.warning : colors.primary}
               onPress={onToggle}
             />
             <MaterialCommunityIcons

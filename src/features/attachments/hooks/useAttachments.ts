@@ -44,8 +44,9 @@ export function useUploadAttachment() {
       if (error) throw error;
       return data;
     },
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
     onSuccess: (_data, variables) => {
-      // Invalidar la lista de adjuntos de la transaccion afectada
       queryClient.invalidateQueries({ queryKey: ['attachments', variables.transactionId] });
     },
   });

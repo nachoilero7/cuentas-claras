@@ -16,10 +16,10 @@ import type { Season } from '@/src/core/types/database';
 // ── Configuracion de estados ────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  active: { label: 'Activa', color: '#16a34a', icon: 'play-circle' },
-  planning: { label: 'Planificacion', color: '#3b82f6', icon: 'calendar-clock' },
-  closed: { label: 'Cerrada', color: '#6b7280', icon: 'lock' },
-} as const;
+  active: { label: 'Activa', colorKey: 'success' as const, icon: 'play-circle' },
+  planning: { label: 'Planificacion', colorKey: 'info' as const, icon: 'calendar-clock' },
+  closed: { label: 'Cerrada', colorKey: 'textSecondary' as const, icon: 'lock' },
+};
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -200,17 +200,17 @@ export default function SeasonsListScreen() {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: statusConfig.color + '1A' },
+                { backgroundColor: colors[statusConfig.colorKey] + '1A' },
               ]}
             >
               <MaterialCommunityIcons
                 name={statusConfig.icon as keyof typeof MaterialCommunityIcons.glyphMap}
                 size={14}
-                color={statusConfig.color}
+                color={colors[statusConfig.colorKey]}
               />
               <Text
                 variant="labelSmall"
-                style={{ color: statusConfig.color, marginLeft: spacing.xxs, fontWeight: '600' }}
+                style={{ color: colors[statusConfig.colorKey], marginLeft: spacing.xxs, fontWeight: '600' }}
               >
                 {statusConfig.label}
               </Text>

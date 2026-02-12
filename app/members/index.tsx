@@ -19,14 +19,6 @@ import { spacing, borderRadius } from '@/src/shared/theme';
 import { USER_ROLE_LABELS } from '@/src/core/config/constants';
 import type { Profile, UserRole } from '@/src/core/types/database';
 
-// ── Colores por rol ──────────────────────────────────────────────────────────
-
-const ROLE_COLORS: Record<UserRole, string> = {
-  admin: '#1B6EF3',
-  manager: '#f59e0b',
-  viewer: '#6b7280',
-};
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getInitials(name: string | null | undefined): string {
@@ -47,6 +39,11 @@ interface MemberCardProps {
 
 function MemberCard({ member, colors }: MemberCardProps) {
   const [copied, setCopied] = useState(false);
+  const ROLE_COLORS: Record<UserRole, string> = {
+    admin: colors.info,
+    manager: colors.warning,
+    viewer: colors.textSecondary,
+  };
   const roleColor = ROLE_COLORS[member.role] ?? ROLE_COLORS.viewer;
   const roleLabel = USER_ROLE_LABELS[member.role] ?? member.role;
   const initials = getInitials(member.full_name);
@@ -324,6 +321,8 @@ export default function MembersDirectoryScreen() {
                 mode={isActive ? 'flat' : 'outlined'}
                 selected={isActive}
                 onPress={() => setRoleFilter(chip.key)}
+                accessibilityLabel={`Filtro rol: ${chip.label}${isActive ? ', seleccionado' : ''}`}
+                accessibilityState={{ selected: isActive }}
                 style={[
                   styles.roleChip,
                   isActive
