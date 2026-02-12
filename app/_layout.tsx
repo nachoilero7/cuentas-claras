@@ -14,6 +14,7 @@ import { AuthProvider } from '@/src/core/providers/AuthProvider';
 import { OfflineBanner } from '@/src/shared/components/feedback/OfflineBanner';
 import { OfflineQueueIndicator } from '@/src/shared/components/feedback/OfflineQueueIndicator';
 import { SnackbarHost } from '@/src/shared/components/feedback/SnackbarHost';
+import { AppErrorBoundary } from '@/src/shared/components/feedback/AppErrorBoundary';
 import { queryClient } from '@/src/core/config/queryClient';
 import { restoreQueryCache, persistQueryCache } from '@/src/sync/queryPersister';
 import { startSyncListener } from '@/src/sync/SyncManager';
@@ -81,13 +82,15 @@ export default function RootLayout() {
     <QueryProvider>
       <ThemeProvider>
         <AuthProvider>
-          <View style={styles.root}>
-            <StatusBar style="auto" />
-            <OfflineBanner />
-            <OfflineQueueIndicator />
-            <Slot />
-            <SnackbarHost />
-          </View>
+          <AppErrorBoundary>
+            <View style={styles.root}>
+              <StatusBar style="auto" />
+              <OfflineBanner />
+              <OfflineQueueIndicator />
+              <Slot />
+              <SnackbarHost />
+            </View>
+          </AppErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
     </QueryProvider>

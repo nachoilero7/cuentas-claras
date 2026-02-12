@@ -29,6 +29,7 @@ import { sendPushToAdmins } from '@/src/core/services/pushNotifications';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
+import { DatePickerInput } from '@/src/shared/components/ui/DatePickerInput';
 import { AttachmentSection } from '@/src/features/attachments/components';
 import { uploadAttachment } from '@/src/features/attachments/services';
 import type { PendingImage } from '@/src/features/attachments/components';
@@ -102,49 +103,16 @@ const transactionSchema = z.object({
     .or(z.literal('')),
   category_id: z.string().uuid('Selecciona un rubro'),
   transfer_to_category_id: z.string().optional(),
-  transaction_date: z
-    .string()
-    .min(1, 'La fecha es obligatoria')
-    .refine(
-      (val) => {
-        // Validar formato DD/MM/YYYY
-        const parts = val.split('/');
-        if (parts.length !== 3) return false;
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const year = parseInt(parts[2], 10);
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
-        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return false;
-        const date = new Date(year, month - 1, day);
-        return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
-      },
-      { message: 'Ingresa una fecha valida en formato DD/MM/AAAA' }
-    ),
+  transaction_date: z.string().min(1, 'La fecha es obligatoria'),
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function parseDateToISO(dateStr: string): string {
-  const parts = dateStr.split('/');
-  const day = parts[0].padStart(2, '0');
-  const month = parts[1].padStart(2, '0');
-  const year = parts[2];
+function dateToISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function formatISOToDisplay(isoDate: string): string {
-  if (!isoDate) return '';
-  const parts = isoDate.split('T')[0].split('-');
-  if (parts.length !== 3) return isoDate;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
-function getTodayFormatted(): string {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear();
-  return `${day}/${month}/${year}`;
 }
 
 // ── Componente ──────────────────────────────────────────────────────────────
@@ -178,12 +146,45 @@ export default function TransactionFormScreen() {
   const [notes, setNotes] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [transferToCategoryId, setTransferToCategoryId] = useState('');
-  const [transactionDate, setTransactionDate] = useState(getTodayFormatted());
+  const [transactionDate, setTransactionDate] = useState(new Date());
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
 
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Validacion inline por campo
+  const validateField = useCallback(
+    (field: string) => {
+      let fieldError = '';
+      switch (field) {
+        case 'amount': {
+          if (!amount.trim()) {
+            fieldError = 'El monto es obligatorio';
+          } else {
+            const num = parseFloat(amount.replace(',', '.'));
+            if (isNaN(num) || num <= 0) fieldError = 'El monto debe ser un numero positivo';
+          }
+          break;
+        }
+        case 'description': {
+          if (description.length > 0 && description.length < 2)
+            fieldError = 'La descripcion debe tener al menos 2 caracteres';
+          if (description.length > 200)
+            fieldError = 'La descripcion no puede exceder 200 caracteres';
+          break;
+        }
+      }
+      setErrors((prev) => {
+        if (!fieldError) {
+          const { [field]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [field]: fieldError };
+      });
+    },
+    [amount, description],
+  );
 
   // Pre-rellenar en modo edicion
   useEffect(() => {
@@ -198,7 +199,7 @@ export default function TransactionFormScreen() {
       setNotes(transaction.notes ?? '');
       setCategoryId(transaction.category_id ?? '');
       setTransferToCategoryId(transaction.transfer_to_category_id ?? '');
-      setTransactionDate(formatISOToDisplay(transaction.transaction_date));
+      setTransactionDate(new Date(transaction.transaction_date + 'T12:00:00'));
       setPaymentMethod(transaction.payment_method ?? 'cash');
     }
   }, [isCreateMode, transaction]);
@@ -212,6 +213,7 @@ export default function TransactionFormScreen() {
   // ── Validacion ────────────────────────────────────────────────────────────
 
   const validate = useCallback((): boolean => {
+    const dateISO = dateToISO(transactionDate);
     const dataToValidate = {
       type,
       amount,
@@ -221,7 +223,7 @@ export default function TransactionFormScreen() {
       notes,
       category_id: categoryId,
       transfer_to_category_id: transferToCategoryId,
-      transaction_date: transactionDate,
+      transaction_date: dateISO,
     };
 
     const result = transactionSchema.safeParse(dataToValidate);
@@ -292,7 +294,7 @@ export default function TransactionFormScreen() {
       payment_method: paymentMethod,
       category_id: categoryId,
       transfer_to_category_id: type === 'transfer' ? transferToCategoryId : null,
-      transaction_date: parseDateToISO(transactionDate),
+      transaction_date: dateToISO(transactionDate),
     };
 
     try {
@@ -555,6 +557,7 @@ export default function TransactionFormScreen() {
               label="Monto"
               value={amount}
               onChangeText={setAmount}
+              onBlur={() => validateField('amount')}
               placeholder="0,00"
               leftIcon="cash"
               error={errors.amount}
@@ -618,6 +621,7 @@ export default function TransactionFormScreen() {
               label="Descripcion"
               value={description}
               onChangeText={setDescription}
+              onBlur={() => validateField('description')}
               placeholder="Ej: Compra de materiales"
               leftIcon="text-box-outline"
               error={errors.description}
@@ -789,16 +793,13 @@ export default function TransactionFormScreen() {
             )}
 
             {/* ── Fecha ──────────────────────────────────────────────── */}
-            <Input
+            <DatePickerInput
               label="Fecha"
               value={transactionDate}
-              onChangeText={setTransactionDate}
-              placeholder="DD/MM/AAAA"
-              leftIcon="calendar"
+              onChange={setTransactionDate}
               error={errors.transaction_date}
-              helperText="Formato: DD/MM/AAAA"
-              keyboardType="default"
-              maxLength={10}
+              maximumDate={new Date()}
+              minimumDate={new Date(2020, 0, 1)}
             />
 
             {/* ── Comprobantes ─────────────────────────────────────── */}
