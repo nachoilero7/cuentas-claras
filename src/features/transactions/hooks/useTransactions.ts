@@ -12,6 +12,7 @@ import type {
   UpdateTransactionData,
   CreateTransactionData,
 } from '../services/transactionService';
+import { useOfflineAware } from '@/src/sync';
 import type { TransactionStatus } from '@/src/core/types/database';
 
 const ONE_MINUTE = 1000 * 60;
@@ -48,16 +49,26 @@ export function useTransaction(id: string) {
 
 export function useCreateTransaction() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async (input: CreateTransactionData & { status?: TransactionStatus }) => {
       const { status, ...data } = input;
-      const { data: transaction, error } = await createTransaction(data, status);
-      if (error) throw error;
-      return transaction;
+
+      const { result, queued } = await executeOrQueue(
+        'create_transaction',
+        { ...data, status } as unknown as Record<string, unknown>,
+        async () => {
+          const { data: transaction, error } = await createTransaction(data, status);
+          if (error) throw error;
+          return transaction;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onSuccess: () => {
-      // Invalidar transacciones, aprobaciones y dashboard para refrescar datos
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -69,15 +80,24 @@ export function useCreateTransaction() {
 
 export function useUpdateTransaction() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & UpdateTransactionData) => {
-      const { data, error } = await updateTransaction(id, updates);
-      if (error) throw error;
-      return data;
+      const { result, queued } = await executeOrQueue(
+        'update_transaction',
+        { id, ...updates } as unknown as Record<string, unknown>,
+        async () => {
+          const { data, error } = await updateTransaction(id, updates);
+          if (error) throw error;
+          return data;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onSuccess: (_data, variables) => {
-      // Invalidar la lista y el detalle de la transaccion actualizada
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['transaction', variables.id] });
     },
@@ -88,15 +108,24 @@ export function useUpdateTransaction() {
 
 export function useDeleteTransaction() {
   const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await deleteTransaction(id);
-      if (error) throw error;
-      return data;
+      const { result, queued } = await executeOrQueue(
+        'delete_transaction',
+        { id },
+        async () => {
+          const { data, error } = await deleteTransaction(id);
+          if (error) throw error;
+          return data;
+        },
+      );
+
+      if (queued) return null;
+      return result;
     },
     onSuccess: () => {
-      // Invalidar las listas de transacciones para reflejar la eliminacion
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
   });

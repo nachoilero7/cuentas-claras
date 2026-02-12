@@ -1,8 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Alert, Switch, Pressable } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  Pressable,
+  Switch,
+} from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -14,6 +25,7 @@ import {
   useDeleteSeason,
   useSetCurrentSeason,
 } from '@/src/features/seasons/hooks/useSeasons';
+import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing } from '@/src/shared/theme';
 import type { SeasonStatus } from '@/src/core/types/database';
@@ -23,8 +35,42 @@ import type { SeasonStatus } from '@/src/core/types/database';
 const seasonSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   description: z.string().nullable().optional(),
-  start_date: z.string().min(1, 'La fecha de inicio es obligatoria'),
-  end_date: z.string().nullable().optional(),
+  start_date: z
+    .string()
+    .min(1, 'La fecha de inicio es obligatoria')
+    .refine(
+      (val) => {
+        const parts = val.split('/');
+        if (parts.length !== 3) return false;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return false;
+        const date = new Date(year, month - 1, day);
+        return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+      },
+      { message: 'Ingresa una fecha valida en formato DD/MM/AAAA' }
+    ),
+  end_date: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === '') return true;
+        const parts = val.split('/');
+        if (parts.length !== 3) return false;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) return false;
+        const date = new Date(year, month - 1, day);
+        return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+      },
+      { message: 'Ingresa una fecha valida en formato DD/MM/AAAA' }
+    ),
   status: z.enum(['active', 'closed', 'planning']),
 });
 
@@ -35,6 +81,31 @@ const STATUS_OPTIONS: { value: SeasonStatus; label: string; icon: string; color:
   { value: 'planning', label: 'Planificacion', icon: 'calendar-clock', color: '#3b82f6' },
   { value: 'closed', label: 'Cerrada', icon: 'lock', color: '#6b7280' },
 ];
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function parseDateToISO(dateStr: string): string {
+  const parts = dateStr.split('/');
+  const day = parts[0].padStart(2, '0');
+  const month = parts[1].padStart(2, '0');
+  const year = parts[2];
+  return `${year}-${month}-${day}`;
+}
+
+function formatISOToDisplay(isoDate: string): string {
+  if (!isoDate) return '';
+  const parts = isoDate.split('T')[0].split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function getTodayFormatted(): string {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 // ── Componente ──────────────────────────────────────────────────────────────
 
@@ -61,7 +132,7 @@ export default function SeasonFormScreen() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const [startDate, setStartDate] = useState(getTodayFormatted());
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState<SeasonStatus>('planning');
   const [isCurrent, setIsCurrent] = useState(false);
@@ -76,8 +147,8 @@ export default function SeasonFormScreen() {
     if (!isCreateMode && season) {
       setName(season.name ?? '');
       setDescription(season.description ?? '');
-      setStartDate(season.start_date ?? '');
-      setEndDate(season.end_date ?? '');
+      setStartDate(season.start_date ? formatISOToDisplay(season.start_date) : '');
+      setEndDate(season.end_date ? formatISOToDisplay(season.end_date) : '');
       setStatus(season.status ?? 'planning');
       setIsCurrent(season.is_current ?? false);
     }
@@ -106,6 +177,16 @@ export default function SeasonFormScreen() {
       return false;
     }
 
+    // Validacion adicional: fecha fin posterior a fecha inicio
+    if (startDate.trim() && endDate.trim()) {
+      const startISO = parseDateToISO(startDate.trim());
+      const endISO = parseDateToISO(endDate.trim());
+      if (endISO < startISO) {
+        setErrors({ end_date: 'La fecha de fin debe ser posterior a la fecha de inicio' });
+        return false;
+      }
+    }
+
     setErrors({});
     return true;
   }, [name, description, startDate, endDate, status]);
@@ -118,8 +199,8 @@ export default function SeasonFormScreen() {
     const payload = {
       name: name.trim(),
       description: description.trim() || null,
-      start_date: startDate.trim(),
-      end_date: endDate.trim() || null,
+      start_date: parseDateToISO(startDate.trim()),
+      end_date: endDate.trim() ? parseDateToISO(endDate.trim()) : null,
       status,
     };
 
@@ -199,255 +280,230 @@ export default function SeasonFormScreen() {
 
   if (!isCreateMode && isSeasonLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <Text
-          variant="bodyMedium"
-          style={{ color: colors.textSecondary }}
-        >
-          Cargando temporada...
-        </Text>
-      </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <Stack.Screen
+          options={{
+            title: 'Editar Temporada',
+          }}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text
+            variant="bodyMedium"
+            style={{ color: colors.textSecondary, marginTop: spacing.sm }}
+          >
+            Cargando temporada...
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   // ── Formulario ────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: colors.background }]}
+      edges={['bottom']}
     >
-      {/* ── Tarjeta del formulario ─────────────────────────────────────────── */}
-      <View style={[styles.form, { backgroundColor: colors.surface }]}>
-        <Text
-          variant="headlineSmall"
-          style={[styles.formTitle, { color: colors.text }]}
+      <Stack.Screen
+        options={{
+          title: isCreateMode ? 'Nueva Temporada' : 'Editar Temporada',
+        }}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {isCreateMode ? 'Nueva Temporada' : 'Editar Temporada'}
-        </Text>
-
-        {/* ── Nombre ───────────────────────────────────────────────────────── */}
-        <View style={styles.fieldGroup}>
-          <Text variant="labelLarge" style={{ color: colors.text, marginBottom: spacing.xs }}>
-            Nombre *
-          </Text>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                borderColor: errors.name ? colors.error : colors.outline,
-                color: colors.text,
-                backgroundColor: colors.background,
-              },
-            ]}
-            value={name}
-            onChangeText={setName}
-            placeholder="Ej: Temporada 2026"
-            placeholderTextColor={colors.textTertiary}
-            maxLength={100}
-            autoCapitalize="sentences"
-            returnKeyType="next"
-          />
-          {errors.name ? (
-            <Text variant="bodySmall" style={{ color: colors.error, marginTop: spacing.xxs }}>
-              {errors.name}
+          {/* ── Tarjeta del formulario ─────────────────────────────────────────── */}
+          <View style={[styles.form, { backgroundColor: colors.surface }]}>
+            <Text
+              variant="headlineSmall"
+              style={[styles.formTitle, { color: colors.text }]}
+            >
+              {isCreateMode ? 'Nueva Temporada' : 'Editar Temporada'}
             </Text>
-          ) : null}
-        </View>
 
-        {/* ── Descripcion ──────────────────────────────────────────────────── */}
-        <View style={styles.fieldGroup}>
-          <Text variant="labelLarge" style={{ color: colors.text, marginBottom: spacing.xs }}>
-            Descripcion
-          </Text>
-          <TextInput
-            style={[
-              styles.textInput,
-              styles.textInputMultiline,
-              {
-                borderColor: colors.outline,
-                color: colors.text,
-                backgroundColor: colors.background,
-              },
-            ]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Descripcion opcional de la temporada"
-            placeholderTextColor={colors.textTertiary}
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-            autoCapitalize="sentences"
-            textAlignVertical="top"
-          />
-        </View>
+            {/* ── Nombre ───────────────────────────────────────────────────────── */}
+            <Input
+              label="Nombre *"
+              value={name}
+              onChangeText={setName}
+              placeholder="Ej: Temporada 2026"
+              leftIcon="tag-outline"
+              error={errors.name}
+              maxLength={100}
+              autoCapitalize="sentences"
+              returnKeyType="next"
+            />
 
-        {/* ── Fecha de inicio ──────────────────────────────────────────────── */}
-        <View style={styles.fieldGroup}>
-          <Text variant="labelLarge" style={{ color: colors.text, marginBottom: spacing.xs }}>
-            Fecha de inicio *
-          </Text>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                borderColor: errors.start_date ? colors.error : colors.outline,
-                color: colors.text,
-                backgroundColor: colors.background,
-              },
-            ]}
-            value={startDate}
-            onChangeText={setStartDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.textTertiary}
-            maxLength={10}
-            keyboardType="numbers-and-punctuation"
-          />
-          {errors.start_date ? (
-            <Text variant="bodySmall" style={{ color: colors.error, marginTop: spacing.xxs }}>
-              {errors.start_date}
-            </Text>
-          ) : null}
-        </View>
+            {/* ── Descripcion ──────────────────────────────────────────────────── */}
+            <Input
+              label="Descripcion"
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Descripcion opcional de la temporada"
+              leftIcon="text-box-outline"
+              error={errors.description}
+              multiline
+              numberOfLines={3}
+              maxLength={500}
+              autoCapitalize="sentences"
+            />
 
-        {/* ── Fecha de fin ─────────────────────────────────────────────────── */}
-        <View style={styles.fieldGroup}>
-          <Text variant="labelLarge" style={{ color: colors.text, marginBottom: spacing.xs }}>
-            Fecha de fin
-          </Text>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                borderColor: colors.outline,
-                color: colors.text,
-                backgroundColor: colors.background,
-              },
-            ]}
-            value={endDate}
-            onChangeText={setEndDate}
-            placeholder="YYYY-MM-DD (opcional)"
-            placeholderTextColor={colors.textTertiary}
-            maxLength={10}
-            keyboardType="numbers-and-punctuation"
-          />
-        </View>
+            {/* ── Fecha de inicio ──────────────────────────────────────────────── */}
+            <Input
+              label="Fecha de inicio *"
+              value={startDate}
+              onChangeText={setStartDate}
+              placeholder="DD/MM/AAAA"
+              leftIcon="calendar"
+              error={errors.start_date}
+              helperText="Formato: DD/MM/AAAA"
+              keyboardType="default"
+              maxLength={10}
+            />
 
-        {/* ── Selector de estado ───────────────────────────────────────────── */}
-        <View style={styles.fieldGroup}>
-          <Text variant="labelLarge" style={{ color: colors.text, marginBottom: spacing.sm }}>
-            Estado
-          </Text>
-          <View style={styles.statusRow}>
-            {STATUS_OPTIONS.map((option) => {
-              const isSelected = status === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  style={[
-                    styles.statusCard,
-                    {
-                      borderColor: isSelected ? option.color : colors.outline,
-                      backgroundColor: isSelected ? option.color + '1A' : colors.background,
-                      borderWidth: isSelected ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => setStatus(option.value)}
-                >
+            {/* ── Fecha de fin ─────────────────────────────────────────────────── */}
+            <Input
+              label="Fecha de fin"
+              value={endDate}
+              onChangeText={setEndDate}
+              placeholder="DD/MM/AAAA (opcional)"
+              leftIcon="calendar-end"
+              error={errors.end_date}
+              helperText="Dejar vacio si la temporada aun no finaliza"
+              keyboardType="default"
+              maxLength={10}
+            />
+
+            {/* ── Selector de estado ───────────────────────────────────────────── */}
+            <View style={styles.section}>
+              <Text
+                variant="labelLarge"
+                style={[styles.sectionLabel, { color: colors.textSecondary }]}
+              >
+                Estado
+              </Text>
+              <View style={styles.statusRow}>
+                {STATUS_OPTIONS.map((option) => {
+                  const isSelected = status === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.statusCard,
+                        {
+                          borderColor: isSelected ? option.color : colors.outlineVariant,
+                          backgroundColor: isSelected ? option.color + '1A' : colors.surfaceVariant,
+                          borderWidth: isSelected ? 2 : 1,
+                        },
+                      ]}
+                      onPress={() => setStatus(option.value)}
+                    >
+                      <MaterialCommunityIcons
+                        name={option.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                        size={24}
+                        color={isSelected ? option.color : colors.textTertiary}
+                      />
+                      <Text
+                        variant="labelSmall"
+                        style={{
+                          color: isSelected ? option.color : colors.textSecondary,
+                          marginTop: spacing.xxs,
+                          fontWeight: isSelected ? '700' : '500',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {errors.status ? (
+                <Text variant="bodySmall" style={[styles.errorText, { color: colors.error }]}>
+                  {errors.status}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* ── Marcar como temporada actual (solo edicion y admin) ─────────── */}
+            {!isCreateMode && isAdmin && (
+              <View style={styles.switchRow}>
+                <View style={styles.switchLabelContainer}>
                   <MaterialCommunityIcons
-                    name={option.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                    size={24}
-                    color={isSelected ? option.color : colors.textSecondary}
+                    name="star-outline"
+                    size={20}
+                    color={isCurrent ? '#f59e0b' : colors.text}
                   />
                   <Text
-                    variant="labelSmall"
-                    style={{
-                      color: isSelected ? option.color : colors.textSecondary,
-                      marginTop: spacing.xxs,
-                      fontWeight: isSelected ? '700' : '500',
-                      textAlign: 'center',
-                    }}
+                    variant="bodyMedium"
+                    style={{ color: colors.text, marginLeft: spacing.sm, flex: 1 }}
                   >
-                    {option.label}
+                    Marcar como temporada actual
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {errors.status ? (
-            <Text variant="bodySmall" style={{ color: colors.error, marginTop: spacing.xxs }}>
-              {errors.status}
-            </Text>
-          ) : null}
-        </View>
+                </View>
+                <Switch
+                  value={isCurrent}
+                  onValueChange={setIsCurrent}
+                  trackColor={{ false: colors.outline, true: colors.primary + '80' }}
+                  thumbColor={isCurrent ? colors.primary : colors.textTertiary}
+                />
+              </View>
+            )}
 
-        {/* ── Marcar como temporada actual (solo edicion) ─────────────────── */}
-        {!isCreateMode && (
-          <View style={styles.switchRow}>
-            <View style={styles.switchLabelContainer}>
-              <MaterialCommunityIcons
-                name="star-outline"
-                size={20}
-                color={colors.text}
-              />
-              <Text
-                variant="bodyMedium"
-                style={{ color: colors.text, marginLeft: spacing.sm, flex: 1 }}
+            {/* ── Boton de guardar ─────────────────────────────────────────────── */}
+            <View style={styles.submitSection}>
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={isSubmitting}
+                disabled={isSubmitting || isDeleting}
+                onPress={handleSubmit}
+                icon={isCreateMode ? 'plus-circle-outline' : 'content-save-outline'}
               >
-                Marcar como temporada actual
-              </Text>
+                {isCreateMode ? 'Crear Temporada' : 'Guardar Cambios'}
+              </Button>
             </View>
-            <Switch
-              value={isCurrent}
-              onValueChange={setIsCurrent}
-              trackColor={{ false: colors.outline, true: colors.primary + '80' }}
-              thumbColor={isCurrent ? colors.primary : colors.textTertiary}
-            />
-          </View>
-        )}
 
-        {/* ── Boton de guardar ─────────────────────────────────────────────── */}
-        <View style={styles.submitSection}>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={isSubmitting}
-            disabled={isSubmitting || isDeleting}
-            onPress={handleSubmit}
-            icon={isCreateMode ? 'plus-circle-outline' : 'content-save-outline'}
-          >
-            {isCreateMode ? 'Crear Temporada' : 'Guardar Cambios'}
-          </Button>
-        </View>
-
-        {/* ── Boton de eliminar (solo edicion y admin) ─────────────────────── */}
-        {!isCreateMode && isAdmin && (
-          <View style={styles.deleteSection}>
-            <Button
-              variant="outline"
-              size="md"
-              fullWidth
-              loading={isDeleting}
-              disabled={isSubmitting || isDeleting}
-              onPress={handleDelete}
-              icon="delete-outline"
-            >
-              Eliminar Temporada
-            </Button>
+            {/* ── Boton de eliminar (solo edicion y admin) ─────────────────────── */}
+            {!isCreateMode && isAdmin && (
+              <View style={styles.deleteSection}>
+                <Button
+                  variant="outline"
+                  size="md"
+                  fullWidth
+                  loading={isDeleting}
+                  disabled={isSubmitting || isDeleting}
+                  onPress={handleDelete}
+                  icon="delete-outline"
+                >
+                  Eliminar Temporada
+                </Button>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
+    flex: 1,
+  },
+  flex: {
     flex: 1,
   },
   loadingContainer: {
@@ -475,19 +531,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
-  fieldGroup: {
-    marginBottom: spacing.sm,
+  section: {
+    gap: spacing.sm,
   },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: spacing.smd,
-    paddingVertical: spacing.sm,
-    fontSize: 16,
-  },
-  textInputMultiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
+  sectionLabel: {
+    fontWeight: '600',
+    marginTop: spacing.xs,
   },
   statusRow: {
     flexDirection: 'row',
@@ -499,7 +548,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.smd,
     paddingHorizontal: spacing.xs,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   switchRow: {
     flexDirection: 'row',
@@ -513,6 +562,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginRight: spacing.sm,
+  },
+  errorText: {
+    marginTop: spacing.xxs,
+    fontSize: 12,
   },
   submitSection: {
     marginTop: spacing.md,

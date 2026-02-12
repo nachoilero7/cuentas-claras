@@ -1,10 +1,12 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Platform,
 } from 'react-native';
 import { Text, Chip, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -44,17 +46,64 @@ const TYPE_ICONS: Record<TransactionType, keyof typeof MaterialCommunityIcons.gl
 
 type FilterType = 'all' | TransactionType;
 
-interface FilterChip {
+interface FilterChipItem {
   key: FilterType;
   label: string;
 }
 
-const FILTER_CHIPS: FilterChip[] = [
+const FILTER_CHIPS: FilterChipItem[] = [
   { key: 'all', label: 'Todos' },
   { key: 'income', label: 'Ingresos' },
   { key: 'expense', label: 'Egresos' },
   { key: 'transfer', label: 'Transferencias' },
 ];
+
+// ── Filtros rapidos de fecha ────────────────────────────────────────────────
+
+type DateFilter = 'all' | 'today' | 'week' | 'month' | 'quarter';
+
+interface DateFilterChipItem {
+  key: DateFilter;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}
+
+const DATE_FILTER_CHIPS: DateFilterChipItem[] = [
+  { key: 'all', label: 'Todo', icon: 'calendar-blank' },
+  { key: 'today', label: 'Hoy', icon: 'calendar-today' },
+  { key: 'week', label: 'Semana', icon: 'calendar-week' },
+  { key: 'month', label: 'Mes', icon: 'calendar-month' },
+  { key: 'quarter', label: 'Trimestre', icon: 'calendar-range' },
+];
+
+function getDateRange(filter: DateFilter): { startDate?: string; endDate?: string } {
+  if (filter === 'all') return {};
+
+  const now = new Date();
+  const endDate = now.toISOString().split('T')[0]; // hoy YYYY-MM-DD
+
+  if (filter === 'today') {
+    return { startDate: endDate, endDate };
+  }
+
+  if (filter === 'week') {
+    const start = new Date(now);
+    const dayOfWeek = start.getDay();
+    // Lunes como inicio de semana
+    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    start.setDate(start.getDate() - diff);
+    return { startDate: start.toISOString().split('T')[0], endDate };
+  }
+
+  if (filter === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { startDate: start.toISOString().split('T')[0], endDate };
+  }
+
+  // quarter - ultimos 3 meses
+  const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+  return { startDate: start.toISOString().split('T')[0], endDate };
+}
 
 // ── Componente ──────────────────────────────────────────────────────────────
 
@@ -63,11 +112,22 @@ export default function TransactionsScreen() {
   const { colors } = useAppTheme();
   const { data: profile } = useProfile();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [activeDateFilter, setActiveDateFilter] = useState<DateFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce de busqueda: actualizar 300ms despues de dejar de escribir
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const role = profile?.role ?? 'viewer';
   const isAdmin = role === 'admin';
 
-  // Non-admin users only see their own transactions
+  // Usuarios no-admin solo ven sus propias transacciones
   const filters = useMemo(() => {
     const f: Record<string, any> = {};
     if (activeFilter !== 'all') {
@@ -76,8 +136,16 @@ export default function TransactionsScreen() {
     if (!isAdmin && user?.id) {
       f.createdBy = user.id;
     }
+    if (debouncedSearch.trim()) {
+      f.search = debouncedSearch.trim();
+    }
+    // Filtros de fecha
+    const dateRange = getDateRange(activeDateFilter);
+    if (dateRange.startDate) f.startDate = dateRange.startDate;
+    if (dateRange.endDate) f.endDate = dateRange.endDate;
+
     return Object.keys(f).length > 0 ? f : undefined;
-  }, [activeFilter, isAdmin, user?.id]);
+  }, [activeFilter, activeDateFilter, isAdmin, user?.id, debouncedSearch]);
 
   const { data: transactions, isLoading, error, refetch } = useTransactions(filters);
 
@@ -153,6 +221,13 @@ export default function TransactionsScreen() {
             onFilterChange={setActiveFilter}
             colors={colors}
           />
+          <View style={styles.dateChipsRow}>
+            <DateFilterChips
+              activeFilter={activeDateFilter}
+              onFilterChange={setActiveDateFilter}
+              colors={colors}
+            />
+          </View>
         </View>
 
         <EmptyState
@@ -191,9 +266,44 @@ export default function TransactionsScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.filtersWrapper}>
+            {/* Barra de busqueda */}
+            <View
+              style={[
+                styles.searchContainer,
+                { backgroundColor: colors.surface, borderColor: colors.outline },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="magnify"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Buscar por descripcion..."
+                placeholderTextColor={colors.textTertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <MaterialCommunityIcons
+                  name="close-circle"
+                  size={20}
+                  color={colors.textSecondary}
+                  onPress={() => setSearchQuery('')}
+                />
+              )}
+            </View>
+
             <FilterChips
               activeFilter={activeFilter}
               onFilterChange={setActiveFilter}
+              colors={colors}
+            />
+            <DateFilterChips
+              activeFilter={activeDateFilter}
+              onFilterChange={setActiveDateFilter}
               colors={colors}
             />
           </View>
@@ -248,6 +358,47 @@ function FilterChips({ activeFilter, onFilterChange, colors }: FilterChipsProps)
             mode={isActive ? 'flat' : 'outlined'}
             selected={isActive}
             onPress={() => onFilterChange(chip.key)}
+            style={[
+              styles.chip,
+              isActive
+                ? { backgroundColor: colors.primary }
+                : { backgroundColor: colors.surface, borderColor: colors.outline },
+            ]}
+            textStyle={[
+              styles.chipText,
+              { color: isActive ? colors.onPrimary : colors.textSecondary },
+            ]}
+            showSelectedOverlay={false}
+            showSelectedCheck={false}
+          >
+            {chip.label}
+          </Chip>
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Filtro de chips de fecha ────────────────────────────────────────────────
+
+interface DateFilterChipsProps {
+  activeFilter: DateFilter;
+  onFilterChange: (filter: DateFilter) => void;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+}
+
+function DateFilterChips({ activeFilter, onFilterChange, colors }: DateFilterChipsProps) {
+  return (
+    <View style={styles.chipsRow}>
+      {DATE_FILTER_CHIPS.map((chip) => {
+        const isActive = activeFilter === chip.key;
+        return (
+          <Chip
+            key={chip.key}
+            mode={isActive ? 'flat' : 'outlined'}
+            selected={isActive}
+            onPress={() => onFilterChange(chip.key)}
+            icon={chip.icon}
             style={[
               styles.chip,
               isActive
@@ -435,10 +586,27 @@ const styles = StyleSheet.create({
   filtersWrapper: {
     paddingBottom: spacing.sm,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: spacing.smd,
+    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xxs,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  dateChipsRow: {
+    marginTop: spacing.sm,
   },
   chip: {
     borderRadius: 20,

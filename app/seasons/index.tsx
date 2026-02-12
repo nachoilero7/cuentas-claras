@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
@@ -24,11 +24,9 @@ const STATUS_CONFIG = {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('es-AR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 // ── Componente ──────────────────────────────────────────────────────────────
@@ -50,6 +48,7 @@ export default function SeasonsListScreen() {
   if (!isProfileLoading && !isAdmin) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Temporadas' }} />
         <MaterialCommunityIcons
           name="lock-outline"
           size={64}
@@ -81,6 +80,7 @@ export default function SeasonsListScreen() {
   if (isLoading || isProfileLoading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Temporadas' }} />
         <ActivityIndicator size="large" color={colors.primary} />
         <Text
           variant="bodyMedium"
@@ -97,6 +97,7 @@ export default function SeasonsListScreen() {
   if (isError) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Temporadas' }} />
         <MaterialCommunityIcons
           name="alert-circle-outline"
           size={64}
@@ -128,6 +129,7 @@ export default function SeasonsListScreen() {
   if (!seasons || seasons.length === 0) {
     return (
       <View style={[styles.flex, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Temporadas' }} />
         <EmptyState
           icon="calendar-blank-outline"
           title="Sin temporadas"
@@ -145,7 +147,7 @@ export default function SeasonsListScreen() {
     const statusConfig = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.planning;
     const dateRange = item.end_date
       ? `${formatDate(item.start_date)} - ${formatDate(item.end_date)}`
-      : `${formatDate(item.start_date)} - Sin fecha fin`;
+      : `${formatDate(item.start_date)} - Presente`;
 
     const cardStyle: import('react-native').ViewStyle = {
       marginHorizontal: spacing.md,
@@ -160,7 +162,7 @@ export default function SeasonsListScreen() {
         style={cardStyle}
       >
         <View style={styles.cardContent}>
-          {/* Fila superior: nombre + estrella + chevron */}
+          {/* Fila superior: nombre + badges + chevron */}
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
               <Text
@@ -171,12 +173,19 @@ export default function SeasonsListScreen() {
                 {item.name}
               </Text>
               {item.is_current && (
-                <MaterialCommunityIcons
-                  name="star"
-                  size={20}
-                  color="#f59e0b"
-                  style={{ marginLeft: spacing.xs }}
-                />
+                <View style={styles.currentBadge}>
+                  <MaterialCommunityIcons
+                    name="star"
+                    size={14}
+                    color="#92400e"
+                  />
+                  <Text
+                    variant="labelSmall"
+                    style={styles.currentBadgeText}
+                  >
+                    Actual
+                  </Text>
+                </View>
               )}
             </View>
             <MaterialCommunityIcons
@@ -242,6 +251,8 @@ export default function SeasonsListScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
+      <Stack.Screen options={{ title: 'Temporadas' }} />
+
       <FlatList
         data={seasons}
         keyExtractor={(item) => item.id}
@@ -301,6 +312,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginRight: spacing.sm,
+  },
+  currentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: 12,
+    marginLeft: spacing.sm,
+  },
+  currentBadgeText: {
+    color: '#92400e',
+    marginLeft: 4,
+    fontWeight: '700',
   },
   badgeRow: {
     flexDirection: 'row',

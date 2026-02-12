@@ -29,11 +29,15 @@ import { sendPushToAdmins } from '@/src/core/services/pushNotifications';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
+import { AttachmentSection } from '@/src/features/attachments/components';
+import { uploadAttachment } from '@/src/features/attachments/services';
+import type { PendingImage } from '@/src/features/attachments/components';
 import {
   TRANSACTION_TYPE_LABELS,
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHOD_ICONS,
 } from '@/src/core/config/constants';
+import { useBiometric } from '@/src/features/security';
 import { spacing } from '@/src/shared/theme';
 import type { TransactionType, CurrencyCode, PaymentMethod } from '@/src/core/types/database';
 
@@ -163,6 +167,7 @@ export default function TransactionFormScreen() {
   const updateTransaction = useUpdateTransaction();
   const deleteTransaction = useDeleteTransaction();
   const createApproval = useCreateApproval();
+  const { authenticate } = useBiometric();
 
   // Estado del formulario
   const [type, setType] = useState<TransactionType>('expense');
@@ -175,6 +180,7 @@ export default function TransactionFormScreen() {
   const [transferToCategoryId, setTransferToCategoryId] = useState('');
   const [transactionDate, setTransactionDate] = useState(getTodayFormatted());
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
 
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -295,6 +301,18 @@ export default function TransactionFormScreen() {
         const status = isAdmin ? 'approved' : 'pending';
         const result = await createTransaction.mutateAsync({ ...payload, status });
 
+        // Subir comprobantes pendientes si los hay
+        if (result && pendingImages.length > 0) {
+          for (const img of pendingImages) {
+            try {
+              await uploadAttachment(result.id, img.uri, img.fileName, img.mimeType);
+            } catch {
+              // Silenciar errores individuales de adjuntos (la transaccion ya se creo)
+            }
+          }
+          setPendingImages([]);
+        }
+
         if (!isAdmin && result) {
           // Crear solicitud de aprobacion para administradores
           await createApproval.mutateAsync({ transactionId: result.id, thresholdAmount: 0 });
@@ -343,6 +361,7 @@ export default function TransactionFormScreen() {
     isAdmin,
     id,
     profile,
+    pendingImages,
     createTransaction,
     createApproval,
     updateTransaction,
@@ -350,7 +369,11 @@ export default function TransactionFormScreen() {
 
   // ── Eliminar movimiento ───────────────────────────────────────────────────
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
+    // Verificacion biometrica antes de eliminar
+    const authenticated = await authenticate('Confirma tu identidad para eliminar este movimiento');
+    if (!authenticated) return;
+
     Alert.alert(
       'Eliminar movimiento',
       'Estas seguro que deseas eliminar este movimiento? Esta accion no se puede deshacer.',
@@ -374,7 +397,7 @@ export default function TransactionFormScreen() {
         },
       ]
     );
-  }, [id, deleteTransaction]);
+  }, [id, deleteTransaction, authenticate]);
 
   // ── Estado de carga ───────────────────────────────────────────────────────
 
@@ -776,6 +799,13 @@ export default function TransactionFormScreen() {
               helperText="Formato: DD/MM/AAAA"
               keyboardType="default"
               maxLength={10}
+            />
+
+            {/* ── Comprobantes ─────────────────────────────────────── */}
+            <AttachmentSection
+              transactionId={isCreateMode ? undefined : id}
+              pendingImages={pendingImages}
+              onPendingImagesChange={setPendingImages}
             />
 
             {/* ── Nota de aprobacion para usuarios no-admin ────────── */}

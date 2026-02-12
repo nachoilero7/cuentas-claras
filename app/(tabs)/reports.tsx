@@ -50,6 +50,66 @@ const FILTER_CHIPS: FilterChipItem[] = [
   { key: 'transfer', label: 'Transferencias' },
 ];
 
+// ── Presets de fechas rapidas ───────────────────────────────────────────────
+
+interface DatePreset {
+  key: string;
+  label: string;
+  getRange: () => { start: string; end: string };
+}
+
+const DATE_PRESETS: DatePreset[] = [
+  {
+    key: 'this_month',
+    label: 'Este mes',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return {
+        start: start.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0],
+      };
+    },
+  },
+  {
+    key: 'last_month',
+    label: 'Mes pasado',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0],
+      };
+    },
+  },
+  {
+    key: 'last_3_months',
+    label: 'Ultimos 3 meses',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+      return {
+        start: start.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0],
+      };
+    },
+  },
+  {
+    key: 'this_year',
+    label: 'Este año',
+    getRange: () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 1);
+      return {
+        start: start.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0],
+      };
+    },
+  },
+];
+
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function ReportsScreen() {
@@ -62,6 +122,7 @@ export default function ReportsScreen() {
   const [endDate, setEndDate] = useState(defaultEndDate);
   const [typeFilter, setTypeFilter] = useState<TransactionType | undefined>(undefined);
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>(undefined);
+  const [selectedPreset, setSelectedPreset] = useState<string | undefined>(undefined);
   const [showFilters, setShowFilters] = useState(true);
 
   // ── Filtros aplicados (solo se actualizan al presionar "Aplicar") ──────
@@ -96,6 +157,13 @@ export default function ReportsScreen() {
 
   const handleTypeFilterChange = useCallback((key: FilterType) => {
     setTypeFilter(key === 'all' ? undefined : (key as TransactionType));
+  }, []);
+
+  const handlePresetSelect = useCallback((preset: DatePreset) => {
+    const { start, end } = preset.getRange();
+    setStartDate(start);
+    setEndDate(end);
+    setSelectedPreset(preset.key);
   }, []);
 
   const handleCategoryFilterChange = useCallback((catId: string | undefined) => {
@@ -247,8 +315,44 @@ export default function ReportsScreen() {
 
         {showFilters && (
           <Card variant="outlined" padding="md" style={{ marginTop: spacing.sm }}>
-            {/* Rango de fechas */}
+            {/* Periodo rapido */}
             <Text variant="labelLarge" style={[styles.filterLabel, { color: colors.textSecondary }]}>
+              Periodo rapido
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
+              {DATE_PRESETS.map((preset) => {
+                const isActive = selectedPreset === preset.key;
+                return (
+                  <Chip
+                    key={preset.key}
+                    mode={isActive ? 'flat' : 'outlined'}
+                    selected={isActive}
+                    onPress={() => handlePresetSelect(preset)}
+                    style={[
+                      styles.chip,
+                      isActive
+                        ? { backgroundColor: colors.primary }
+                        : { backgroundColor: colors.surface, borderColor: colors.outline },
+                    ]}
+                    textStyle={[
+                      styles.chipText,
+                      { color: isActive ? colors.onPrimary : colors.textSecondary },
+                    ]}
+                    showSelectedOverlay={false}
+                    showSelectedCheck={false}
+                  >
+                    {preset.label}
+                  </Chip>
+                );
+              })}
+            </ScrollView>
+
+            {/* Rango de fechas */}
+            <Text variant="labelLarge" style={[styles.filterLabel, { color: colors.textSecondary, marginTop: spacing.smd }]}>
               Rango de fechas
             </Text>
             <View style={styles.dateRow}>
@@ -266,7 +370,7 @@ export default function ReportsScreen() {
                     },
                   ]}
                   value={startDate}
-                  onChangeText={setStartDate}
+                  onChangeText={(text) => { setStartDate(text); setSelectedPreset(undefined); }}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={10}
@@ -286,7 +390,7 @@ export default function ReportsScreen() {
                     },
                   ]}
                   value={endDate}
-                  onChangeText={setEndDate}
+                  onChangeText={(text) => { setEndDate(text); setSelectedPreset(undefined); }}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={10}

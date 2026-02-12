@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useBiometric } from '@/src/features/security';
 import {
   usePendingApprovals,
   useAllApprovals,
@@ -67,6 +68,7 @@ export default function ApprovalsListScreen() {
 
   const approveMutation = useApproveRequest();
   const rejectMutation = useRejectRequest();
+  const { authenticate } = useBiometric();
 
   // Modal de rechazo (Alert.prompt solo funciona en iOS)
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -96,7 +98,11 @@ export default function ApprovalsListScreen() {
   // ── Aprobar solicitud ─────────────────────────────────────────────────────
 
   const handleApprove = useCallback(
-    (approvalId: string) => {
+    async (approvalId: string) => {
+      // Verificacion biometrica antes de aprobar
+      const authenticated = await authenticate('Confirma tu identidad para aprobar la transaccion');
+      if (!authenticated) return;
+
       Alert.alert(
         'Confirmar aprobacion',
         'Esta seguro de que desea aprobar esta transaccion?',
@@ -124,7 +130,7 @@ export default function ApprovalsListScreen() {
         ],
       );
     },
-    [approveMutation],
+    [approveMutation, authenticate],
   );
 
   // ── Rechazar solicitud ────────────────────────────────────────────────────
@@ -135,7 +141,7 @@ export default function ApprovalsListScreen() {
     setRejectModalVisible(true);
   }, []);
 
-  const confirmReject = useCallback(() => {
+  const confirmReject = useCallback(async () => {
     if (!rejectingId) return;
 
     const comment = rejectComment.trim();
@@ -143,6 +149,10 @@ export default function ApprovalsListScreen() {
       Alert.alert('Error', 'Debes ingresar un comentario para rechazar.');
       return;
     }
+
+    // Verificacion biometrica antes de rechazar
+    const authenticated = await authenticate('Confirma tu identidad para rechazar la transaccion');
+    if (!authenticated) return;
 
     rejectMutation.mutate(
       { id: rejectingId, comment },
@@ -160,7 +170,7 @@ export default function ApprovalsListScreen() {
         },
       },
     );
-  }, [rejectingId, rejectComment, rejectMutation]);
+  }, [rejectingId, rejectComment, rejectMutation, authenticate]);
 
   // ── Guard: solo admin o manager pueden acceder ────────────────────────────
 
