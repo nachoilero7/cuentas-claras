@@ -1,52 +1,316 @@
-import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import { useCallback } from 'react';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useCategories } from '@/src/features/categories/hooks/useCategories';
+import { Card } from '@/src/shared/components/ui/Card';
+import { Button } from '@/src/shared/components/ui/Button';
+import { EmptyState } from '@/src/shared/components/feedback/EmptyState';
+import { formatCurrency } from '@/src/core/utils/currency';
 import { spacing } from '@/src/shared/theme';
+import type { Category } from '@/src/core/types/database';
+
+// ── Componente ──────────────────────────────────────────────────────────────
 
 export default function CategoriesScreen() {
   const { colors } = useAppTheme();
+  const { data: profile } = useProfile();
+  const { data: categories, isLoading, error, refetch } = useCategories();
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.placeholder, { backgroundColor: colors.surfaceVariant }]}>
+  const role = profile?.role ?? 'viewer';
+  const canManage = role === 'admin' || role === 'manager';
+
+  const handleRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const handleNavigateToNew = useCallback(() => {
+    router.push('/categories/new');
+  }, []);
+
+  const handleNavigateToEdit = useCallback((id: string) => {
+    router.push(`/categories/${id}`);
+  }, []);
+
+  // ── Estado de carga ───────────────────────────────────────────────────────
+
+  if (isLoading) {
+    return (
+      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text
+          variant="bodyMedium"
+          style={[styles.loadingText, { color: colors.textSecondary }]}
+        >
+          Cargando rubros...
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Estado de error ───────────────────────────────────────────────────────
+
+  if (error) {
+    return (
+      <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <MaterialCommunityIcons
-          name="tag-multiple"
+          name="alert-circle-outline"
           size={48}
-          color={colors.textTertiary}
+          color={colors.error}
         />
         <Text
           variant="bodyLarge"
-          style={[styles.placeholderText, { color: colors.textSecondary }]}
+          style={[styles.errorTitle, { color: colors.text }]}
         >
-          Rubros en desarrollo
+          Error al cargar rubros
         </Text>
         <Text
-          variant="bodySmall"
-          style={{ color: colors.textTertiary, textAlign: 'center' }}
+          variant="bodyMedium"
+          style={[styles.errorMessage, { color: colors.textSecondary }]}
         >
-          Aqui podras administrar las categorias y subcategorias para clasificar tus movimientos.
+          {error instanceof Error ? error.message : 'Ocurrio un error inesperado.'}
         </Text>
+        <Button variant="primary" size="md" onPress={handleRefresh} icon="refresh">
+          Reintentar
+        </Button>
       </View>
+    );
+  }
+
+  // ── Estado vacio ──────────────────────────────────────────────────────────
+
+  if (!categories || categories.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <EmptyState
+          icon="tag-off-outline"
+          title="Sin rubros"
+          description="Crea tu primer rubro para empezar a organizar los movimientos."
+          actionLabel={canManage ? 'Crear rubro' : undefined}
+          onAction={canManage ? handleNavigateToNew : undefined}
+        />
+      </View>
+    );
+  }
+
+  // ── Lista de categorias ───────────────────────────────────────────────────
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <FlatList
+        data={categories}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+        renderItem={({ item }) => (
+          <CategoryCard
+            category={item}
+            colors={colors}
+            onPress={() => handleNavigateToEdit(item.id)}
+          />
+        )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
+
+      {canManage && (
+        <FAB
+          icon="plus"
+          label="Nuevo"
+          onPress={handleNavigateToNew}
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+          color={colors.onPrimary}
+        />
+      )}
     </View>
   );
 }
 
+// ── Tarjeta de categoria ────────────────────────────────────────────────────
+
+interface CategoryCardProps {
+  category: Category;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+  onPress: () => void;
+}
+
+function CategoryCard({ category, colors, onPress }: CategoryCardProps) {
+  const iconName = (category.icon ?? 'tag') as keyof typeof MaterialCommunityIcons.glyphMap;
+  const categoryColor = category.color ?? colors.primary;
+
+  const hasBudgetArs = category.budget_limit_ars !== null && category.budget_limit_ars > 0;
+  const hasBudgetUsd = category.budget_limit_usd !== null && category.budget_limit_usd > 0;
+  const hasBudget = hasBudgetArs || hasBudgetUsd;
+
+  return (
+    <Card variant="elevated" padding="none" onPress={onPress}>
+      <View style={styles.cardContent}>
+        {/* Indicador de color e icono */}
+        <View style={styles.cardLeft}>
+          <View
+            style={[
+              styles.colorDot,
+              { backgroundColor: categoryColor },
+            ]}
+          />
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: categoryColor + '18' },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={iconName}
+              size={24}
+              color={categoryColor}
+            />
+          </View>
+        </View>
+
+        {/* Informacion */}
+        <View style={styles.cardInfo}>
+          <Text
+            variant="titleMedium"
+            style={[styles.categoryName, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {category.name}
+          </Text>
+
+          {category.description ? (
+            <Text
+              variant="bodySmall"
+              style={{ color: colors.textSecondary }}
+              numberOfLines={2}
+            >
+              {category.description}
+            </Text>
+          ) : null}
+
+          {hasBudget && (
+            <View style={styles.budgetContainer}>
+              <MaterialCommunityIcons
+                name="cash-multiple"
+                size={14}
+                color={colors.textTertiary}
+              />
+              <Text
+                variant="labelSmall"
+                style={{ color: colors.textTertiary, marginLeft: 4 }}
+              >
+                {hasBudgetArs
+                  ? `Presupuesto: ${formatCurrency(category.budget_limit_ars!, 'ARS')}`
+                  : ''}
+                {hasBudgetArs && hasBudgetUsd ? ' / ' : ''}
+                {hasBudgetUsd
+                  ? `${formatCurrency(category.budget_limit_usd!, 'USD')}`
+                  : ''}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Flecha de navegacion */}
+        <MaterialCommunityIcons
+          name="chevron-right"
+          size={24}
+          color={colors.textTertiary}
+        />
+      </View>
+    </Card>
+  );
+}
+
+// ── Estilos ─────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.md,
   },
-  placeholder: {
+  centered: {
     flex: 1,
-    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: spacing.lg,
+    gap: spacing.smd,
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+  },
+  errorTitle: {
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  errorMessage: {
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  listContent: {
+    padding: spacing.md,
+    paddingBottom: 100,
+  },
+  separator: {
+    height: spacing.sm,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.smd,
+  },
+  cardLeft: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  colorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    zIndex: 1,
+  },
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
   },
-  placeholderText: {
+  cardInfo: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  categoryName: {
     fontWeight: '600',
+  },
+  budgetContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xxs,
+  },
+  fab: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.md,
+    borderRadius: 16,
   },
 });
