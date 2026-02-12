@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PaperProvider } from 'react-native-paper';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -16,14 +17,22 @@ import {
 
 // ── Tipos del contexto ──────────────────────────────────────────────────────
 
+export type ThemeMode = 'system' | 'light' | 'dark';
+
 interface ThemeContextValue {
   isDark: boolean;
   colors: ColorScheme;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
 }
+
+const THEME_STORAGE_KEY = 'cuentas-claras-theme-mode';
 
 const ThemeContext = createContext<ThemeContextValue>({
   isDark: false,
   colors: lightColorScheme,
+  themeMode: 'system',
+  setThemeMode: () => {},
 });
 
 /**
@@ -68,16 +77,36 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const systemColorScheme = useColorScheme();
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+
+  // Restaurar preferencia guardada
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_STORAGE_KEY).then((stored) => {
+      if (stored === 'light' || stored === 'dark' || stored === 'system') {
+        setThemeModeState(stored);
+      }
+    });
+  }, []);
+
+  // Guardar preferencia y actualizar estado
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    setThemeModeState(mode);
+    AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
+  }, []);
+
+  // Resolver si es dark basado en el modo elegido
+  const isDark = themeMode === 'system'
+    ? systemColorScheme === 'dark'
+    : themeMode === 'dark';
 
   const appColors = isDark ? darkColorScheme : lightColorScheme;
   const paperTheme = isDark ? darkPaperTheme : lightPaperTheme;
   const navigationTheme = isDark ? navDarkTheme : navLightTheme;
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ isDark, colors: appColors }),
-    [isDark, appColors],
+    () => ({ isDark, colors: appColors, themeMode, setThemeMode }),
+    [isDark, appColors, themeMode, setThemeMode],
   );
 
   return (
