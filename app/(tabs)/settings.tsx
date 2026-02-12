@@ -208,6 +208,30 @@ export default function SettingsScreen() {
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant }} />
           <Pressable
             style={styles.infoRow}
+            onPress={() => router.push('/approvals')}
+          >
+            <MaterialCommunityIcons
+              name="clipboard-check-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <View style={styles.infoContent}>
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                Aprobaciones
+              </Text>
+              <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                Revisar transacciones pendientes
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={colors.textTertiary}
+            />
+          </Pressable>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant }} />
+          <Pressable
+            style={styles.infoRow}
             onPress={() => router.push('/seasons')}
           >
             <MaterialCommunityIcons
