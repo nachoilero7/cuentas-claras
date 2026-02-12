@@ -14,6 +14,7 @@ import { OfflineBanner } from '@/src/shared/components/feedback/OfflineBanner';
 import { queryClient } from '@/src/core/config/queryClient';
 import { restoreQueryCache, persistQueryCache } from '@/src/sync/queryPersister';
 import { startSyncListener } from '@/src/sync/SyncManager';
+import { usePushNotifications } from '@/src/core/hooks/usePushNotifications';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -62,6 +63,9 @@ export default function RootLayout() {
     const unsubscribe = startSyncListener(queryClient);
     return unsubscribe;
   }, []);
+
+  // Registrar push notifications
+  usePushNotifications();
 
   if (!fontsLoaded) {
     return null;
