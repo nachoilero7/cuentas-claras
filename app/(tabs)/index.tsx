@@ -156,6 +156,7 @@ interface CategoryRowProps {
   surfaceColor: string;
   textColor: string;
   secondaryTextColor: string;
+  onPress?: () => void;
 }
 
 function CategoryRow({
@@ -167,11 +168,17 @@ function CategoryRow({
   surfaceColor,
   textColor,
   secondaryTextColor,
+  onPress,
 }: CategoryRowProps) {
   const barColor = color || FINANCIAL_COLORS.expense;
 
   return (
-    <View style={styles.categoryRow}>
+    <Pressable
+      style={styles.categoryRow}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}: ${formatCurrency(amount)}`}
+    >
       <View style={styles.categoryHeader}>
         <View style={styles.categoryNameRow}>
           {icon ? (
@@ -220,7 +227,7 @@ function CategoryRow({
           ]}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -414,6 +421,8 @@ export default function DashboardScreen() {
               <Pressable
                 style={[styles.counterChip, { backgroundColor: colors.surface }]}
                 onPress={() => router.push('/approvals')}
+                accessibilityRole="button"
+                accessibilityLabel={`${summary?.pending_approvals} aprobaciones pendientes`}
               >
                 <MaterialCommunityIcons
                   name="clock-outline"
@@ -546,6 +555,10 @@ export default function DashboardScreen() {
                     surfaceColor={colors.surfaceVariant}
                     textColor={colors.text}
                     secondaryTextColor={colors.textSecondary}
+                    onPress={() => router.push({
+                      pathname: '/(tabs)/transactions',
+                      params: { categoryId: cat.category_id, type: 'expense' },
+                    })}
                   />
                 ))}
               </View>

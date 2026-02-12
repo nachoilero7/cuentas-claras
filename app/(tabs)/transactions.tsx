@@ -6,11 +6,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  Pressable,
   Platform,
 } from 'react-native';
 import { Text, Chip, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -111,7 +112,13 @@ export default function TransactionsScreen() {
   const { user } = useAuth();
   const { colors } = useAppTheme();
   const { data: profile } = useProfile();
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const params = useLocalSearchParams<{ categoryId?: string; type?: string }>();
+  const [activeFilter, setActiveFilter] = useState<FilterType>(
+    (params.type as FilterType) || 'all'
+  );
+  const [activeCategoryId, setActiveCategoryId] = useState<string | undefined>(
+    params.categoryId || undefined
+  );
   const [activeDateFilter, setActiveDateFilter] = useState<DateFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -133,6 +140,9 @@ export default function TransactionsScreen() {
     if (activeFilter !== 'all') {
       f.type = activeFilter as TransactionType;
     }
+    if (activeCategoryId) {
+      f.categoryId = activeCategoryId;
+    }
     if (!isAdmin && user?.id) {
       f.createdBy = user.id;
     }
@@ -145,7 +155,7 @@ export default function TransactionsScreen() {
     if (dateRange.endDate) f.endDate = dateRange.endDate;
 
     return Object.keys(f).length > 0 ? f : undefined;
-  }, [activeFilter, activeDateFilter, isAdmin, user?.id, debouncedSearch]);
+  }, [activeFilter, activeCategoryId, activeDateFilter, isAdmin, user?.id, debouncedSearch]);
 
   const { data: transactions, isLoading, error, refetch } = useTransactions(filters);
 
@@ -249,6 +259,7 @@ export default function TransactionsScreen() {
             onPress={handleNavigateToNew}
             style={[styles.fab, { backgroundColor: colors.primary }]}
             color={colors.onPrimary}
+            accessibilityLabel="Crear nuevo movimiento"
           />
         )}
       </View>
@@ -285,20 +296,27 @@ export default function TransactionsScreen() {
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCorrect={false}
+                accessibilityLabel="Buscar movimientos"
               />
               {searchQuery.length > 0 && (
-                <MaterialCommunityIcons
-                  name="close-circle"
-                  size={20}
-                  color={colors.textSecondary}
+                <Pressable
                   onPress={() => setSearchQuery('')}
-                />
+                  hitSlop={8}
+                  accessibilityLabel="Limpiar busqueda"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons
+                    name="close-circle"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </Pressable>
               )}
             </View>
 
             <FilterChips
               activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
+              onFilterChange={(f) => { setActiveFilter(f); }}
               colors={colors}
             />
             <DateFilterChips
@@ -306,6 +324,16 @@ export default function TransactionsScreen() {
               onFilterChange={setActiveDateFilter}
               colors={colors}
             />
+            {activeCategoryId && (
+              <Chip
+                icon="tag"
+                onClose={() => setActiveCategoryId(undefined)}
+                style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
+                textStyle={{ fontSize: 12 }}
+              >
+                Filtrando por rubro
+              </Chip>
+            )}
           </View>
         }
         refreshControl={
@@ -333,6 +361,7 @@ export default function TransactionsScreen() {
           onPress={handleNavigateToNew}
           style={[styles.fab, { backgroundColor: colors.primary }]}
           color={colors.onPrimary}
+          accessibilityLabel="Crear nuevo movimiento"
         />
       )}
     </View>

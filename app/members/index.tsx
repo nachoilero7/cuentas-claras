@@ -182,6 +182,8 @@ function MemberCard({ member, colors }: MemberCardProps) {
                 onPress={handleCopyAlias}
                 hitSlop={8}
                 style={[styles.copyBtn, { backgroundColor: colors.surfaceVariant }]}
+                accessibilityRole="button"
+                accessibilityLabel={copied ? 'Alias copiado' : 'Copiar alias de pago'}
               >
                 <MaterialCommunityIcons
                   name={copied ? 'check' : 'content-copy'}

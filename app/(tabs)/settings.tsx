@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, Pressable, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Pressable, TextInput } from 'react-native';
 import { Text, Divider, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -74,7 +74,11 @@ export default function SettingsScreen() {
   }, [aliasValue, updateProfile]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {/* ── Tarjeta de perfil ──────────────────────────────────────────── */}
       <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
         <View style={[styles.avatar, { backgroundColor: colors.primaryContainer }]}>
@@ -511,7 +515,7 @@ export default function SettingsScreen() {
           Cerrar Sesion
         </Button>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -549,7 +553,10 @@ function InfoRow({ icon, label, value, colors }: InfoRowProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
     padding: spacing.md,
+    paddingBottom: spacing.xl,
   },
   profileCard: {
     borderRadius: 16,
@@ -654,7 +661,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   logoutSection: {
-    marginTop: 'auto',
+    marginTop: spacing.md,
     paddingBottom: spacing.md,
   },
 });

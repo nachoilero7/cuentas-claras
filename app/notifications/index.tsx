@@ -10,6 +10,8 @@ import {
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { router } from 'expo-router';
+
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import {
   useNotifications,
@@ -57,6 +59,16 @@ function getNotificationIcon(type: string): keyof typeof MaterialCommunityIcons.
       return 'alert-circle';
     case 'approval':
       return 'clipboard-check';
+    case 'approval_approved':
+      return 'check-circle';
+    case 'approval_rejected':
+      return 'close-circle';
+    case 'transaction':
+      return 'swap-horizontal-bold';
+    case 'role_change':
+      return 'shield-account';
+    case 'system':
+      return 'information';
     default:
       return 'bell';
   }
@@ -68,8 +80,36 @@ function getNotificationIconColor(type: string, colors: ReturnType<typeof useApp
       return colors.warning;
     case 'approval':
       return colors.info;
+    case 'approval_approved':
+      return '#16a34a';
+    case 'approval_rejected':
+      return colors.error;
+    case 'transaction':
+      return '#3b82f6';
+    case 'role_change':
+      return colors.primary;
+    case 'system':
+      return colors.textSecondary;
     default:
       return colors.primary;
+  }
+}
+
+function getNotificationRoute(notification: Notification): string | null {
+  const { type, data } = notification;
+  const transactionId = (data as Record<string, unknown>)?.transaction_id as string | undefined;
+
+  switch (type) {
+    case 'budget_alert':
+      return '/budget-alerts';
+    case 'approval':
+      return '/approvals';
+    case 'approval_approved':
+    case 'approval_rejected':
+    case 'transaction':
+      return transactionId ? `/transactions/${transactionId}` : '/(tabs)/transactions';
+    default:
+      return null;
   }
 }
 
@@ -93,10 +133,14 @@ export default function NotificationsScreen() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleMarkAsRead = useCallback(
+  const handleNotificationPress = useCallback(
     (notification: Notification) => {
       if (!notification.is_read) {
         markAsReadMutation.mutate(notification.id);
+      }
+      const route = getNotificationRoute(notification);
+      if (route) {
+        router.push(route as any);
       }
     },
     [markAsReadMutation],
@@ -175,9 +219,10 @@ export default function NotificationsScreen() {
     const iconColor = getNotificationIconColor(item.type, colors);
     const relativeTime = getRelativeTime(item.created_at);
     const isUnread = !item.is_read;
+    const isNavigable = getNotificationRoute(item) !== null;
 
     return (
-      <Pressable onPress={() => handleMarkAsRead(item)}>
+      <Pressable onPress={() => handleNotificationPress(item)}>
         <Card
           variant={isUnread ? 'elevated' : 'outlined'}
           padding="md"
@@ -244,6 +289,16 @@ export default function NotificationsScreen() {
                 {relativeTime}
               </Text>
             </View>
+
+            {/* Chevron de navegacion */}
+            {isNavigable && (
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color={colors.textTertiary}
+                style={styles.notificationChevron}
+              />
+            )}
           </View>
         </Card>
       </Pressable>
@@ -277,6 +332,8 @@ export default function NotificationsScreen() {
           style={styles.markAllButton}
           onPress={handleMarkAllAsRead}
           disabled={markAllAsReadMutation.isPending}
+          accessibilityRole="button"
+          accessibilityLabel="Marcar todas las notificaciones como leidas"
         >
           <MaterialCommunityIcons
             name="check-all"
@@ -401,5 +458,9 @@ const styles = StyleSheet.create({
   },
   notificationContent: {
     flex: 1,
+  },
+  notificationChevron: {
+    alignSelf: 'center',
+    marginLeft: spacing.xs,
   },
 });
