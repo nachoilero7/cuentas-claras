@@ -22,4 +22,4 @@ export type { ScreenProps, LoadingScreenProps } from './layout';
 
 // Feedback
 export { OfflineBanner, EmptyState } from './feedback';
-export type { OfflineBannerProps, EmptyStateProps } from './feedback';
+export type { EmptyStateProps } from './feedback';

@@ -1,97 +1,44 @@
-/**
- * Componente OfflineBanner - Indicador de conexion a internet
- *
- * Muestra un banner animado cuando el dispositivo esta sin conexion.
- * Utiliza el hook useNetworkStatus para detectar el estado de red.
- */
-
-import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Animated, Platform } from 'react-native';
-import { Text, Icon, useTheme } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { useEffect, useState } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
+import { Text } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNetworkStatus } from '@/src/core/hooks/useNetworkStatus';
-import { spacing } from '@/src/shared/theme/spacing';
-import { typography, fontWeight } from '@/src/shared/theme/typography';
+import { spacing } from '@/src/shared/theme';
 
-// ── Tipos ───────────────────────────────────────────────────────────────────
-export interface OfflineBannerProps {
-  /** ID para pruebas */
-  testID?: string;
-}
-
-// ── Constantes ──────────────────────────────────────────────────────────────
-const BANNER_HEIGHT = 44;
-const ANIMATION_DURATION = 300;
-
-// ── Componente ──────────────────────────────────────────────────────────────
-export function OfflineBanner({ testID }: OfflineBannerProps) {
-  const theme = useTheme();
-  const { isConnected } = useNetworkStatus();
-  const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(-BANNER_HEIGHT)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const [isVisible, setIsVisible] = useState(false);
-
-  const isOffline = isConnected === false;
+export function OfflineBanner() {
+  const { isConnected, isInternetReachable } = useNetworkStatus();
+  const isOffline = isConnected === false || isInternetReachable === false;
+  const [slideAnim] = useState(() => new Animated.Value(isOffline ? 0 : -50));
 
   useEffect(() => {
-    if (isOffline) {
-      setIsVisible(true);
-      // Deslizar hacia abajo (mostrar)
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Deslizar hacia arriba (ocultar)
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -BANNER_HEIGHT,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Ocultar despues de que la animacion termine
-        setIsVisible(false);
-      });
-    }
-  }, [isOffline, slideAnim, opacityAnim]);
+    Animated.timing(slideAnim, {
+      toValue: isOffline ? 0 : -50,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isOffline, slideAnim]);
 
-  // No renderizar nada si estamos conectados y la animacion termino
-  if (!isVisible && !isOffline) {
-    return null;
-  }
+  if (isConnected === null) return null; // Still loading
 
   return (
     <Animated.View
       style={[
         styles.container,
-        {
-          backgroundColor: theme.colors.error,
-          paddingTop: Platform.OS === 'ios' ? insets.top : 0,
-          transform: [{ translateY: slideAnim }],
-          opacity: opacityAnim,
-        },
+        { transform: [{ translateY: slideAnim }] },
       ]}
-      testID={testID}
     >
       <View style={styles.content}>
-        <Icon source="wifi-off" size={18} color="#ffffff" />
-        <Text style={styles.text}>Sin conexion a internet</Text>
+        <MaterialCommunityIcons
+          name="wifi-off"
+          size={16}
+          color="#ffffff"
+        />
+        <Text
+          variant="labelSmall"
+          style={styles.text}
+        >
+          Sin conexion - Modo offline
+        </Text>
       </View>
     </Animated.View>
   );
@@ -99,25 +46,23 @@ export function OfflineBanner({ testID }: OfflineBannerProps) {
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: '#ef4444',
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 9999,
-    elevation: 10,
+    zIndex: 999,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: BANNER_HEIGHT,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   text: {
     color: '#ffffff',
-    fontSize: typography.body2.fontSize,
-    lineHeight: typography.body2.lineHeight,
-    fontWeight: fontWeight.semibold,
+    fontWeight: '600',
   },
 });
