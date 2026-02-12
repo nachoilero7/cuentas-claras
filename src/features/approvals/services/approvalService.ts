@@ -152,7 +152,7 @@ export async function rejectRequest(id: string, comment: string) {
 
 // ─── Crear una nueva solicitud de aprobacion ────────────────────────────────
 
-export async function createApprovalRequest(transactionId: string, thresholdAmount: number) {
+export async function createApprovalRequest(transactionId: string, thresholdAmount: number = 0) {
   // Obtener el usuario autenticado como solicitante
   const {
     data: { user },
@@ -185,15 +185,9 @@ export function getApprovalConfig(): ApprovalConfig {
   return { ...DEFAULT_CONFIG };
 }
 
-// ─── Verificar si un monto requiere aprobacion ─────────────────────────────
+// ─── Verificar si una transaccion requiere aprobacion ───────────────────────
+// Todas las transacciones de usuarios no-admin requieren aprobacion obligatoria.
 
-export function needsApproval(amount: number, currency: string): boolean {
-  const config = getApprovalConfig();
-
-  if (currency === 'USD') {
-    return amount >= config.threshold_usd;
-  }
-
-  // Para ARS y cualquier otra moneda, usar umbral en pesos
-  return amount >= config.threshold_ars;
+export function needsApproval(_amount: number, _currency: string): boolean {
+  return true;
 }

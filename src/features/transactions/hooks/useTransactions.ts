@@ -6,7 +6,13 @@ import {
   updateTransaction,
   deleteTransaction,
 } from '../services/transactionService';
-import type { TransactionWithCategory, TransactionFilters, UpdateTransactionData } from '../services/transactionService';
+import type {
+  TransactionWithCategory,
+  TransactionFilters,
+  UpdateTransactionData,
+  CreateTransactionData,
+} from '../services/transactionService';
+import type { TransactionStatus } from '@/src/core/types/database';
 
 const ONE_MINUTE = 1000 * 60;
 
@@ -44,14 +50,17 @@ export function useCreateTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Parameters<typeof createTransaction>[0]) => {
-      const { data: transaction, error } = await createTransaction(data);
+    mutationFn: async (input: CreateTransactionData & { status?: TransactionStatus }) => {
+      const { status, ...data } = input;
+      const { data: transaction, error } = await createTransaction(data, status);
       if (error) throw error;
       return transaction;
     },
     onSuccess: () => {
-      // Invalidar las listas de transacciones para refrescar los datos
+      // Invalidar transacciones, aprobaciones y dashboard para refrescar datos
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

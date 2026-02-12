@@ -24,6 +24,9 @@ import {
   useUpdateTransaction,
   useDeleteTransaction,
 } from '@/src/features/transactions/hooks/useTransactions';
+import { useCreateApproval } from '@/src/features/approvals/hooks/useApprovals';
+import { sendPushToAdmins } from '@/src/core/services/pushNotifications';
+import { formatCurrency } from '@/src/core/utils/currency';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
 import { TRANSACTION_TYPE_LABELS } from '@/src/core/config/constants';
@@ -148,6 +151,7 @@ export default function TransactionFormScreen() {
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
   const deleteTransaction = useDeleteTransaction();
+  const createApproval = useCreateApproval();
 
   // Estado del formulario
   const [type, setType] = useState<TransactionType>('expense');
@@ -273,10 +277,32 @@ export default function TransactionFormScreen() {
 
     try {
       if (isCreateMode) {
-        await createTransaction.mutateAsync(payload);
-        Alert.alert('Movimiento registrado', 'El movimiento se registro correctamente.', [
-          { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        // Admin: aprobacion directa. No-admin: pendiente + solicitud de aprobacion
+        const status = isAdmin ? 'approved' : 'pending';
+        const result = await createTransaction.mutateAsync({ ...payload, status });
+
+        if (!isAdmin && result) {
+          // Crear solicitud de aprobacion para administradores
+          await createApproval.mutateAsync({ transactionId: result.id, thresholdAmount: 0 });
+
+          // Enviar push notification a todos los administradores
+          const formattedAmount = formatCurrency(parsedAmount, currency);
+          sendPushToAdmins(
+            'Nueva transaccion pendiente',
+            `${profile?.full_name ?? 'Un usuario'} registro: ${description.trim()} por ${formattedAmount}`,
+            { type: 'approval_pending', transactionId: result.id },
+          );
+
+          Alert.alert(
+            'Movimiento enviado',
+            'Tu movimiento fue enviado para aprobacion. Te notificaremos cuando sea revisado por un administrador.',
+            [{ text: 'Aceptar', onPress: () => router.back() }],
+          );
+        } else {
+          Alert.alert('Movimiento registrado', 'El movimiento se registro correctamente.', [
+            { text: 'Aceptar', onPress: () => router.back() },
+          ]);
+        }
       } else {
         await updateTransaction.mutateAsync({ id: id!, ...payload });
         Alert.alert('Movimiento actualizado', 'Los cambios se guardaron correctamente.', [
@@ -300,8 +326,11 @@ export default function TransactionFormScreen() {
     transferToCategoryId,
     transactionDate,
     isCreateMode,
+    isAdmin,
     id,
+    profile,
     createTransaction,
+    createApproval,
     updateTransaction,
   ]);
 
@@ -687,6 +716,19 @@ export default function TransactionFormScreen() {
               maxLength={10}
             />
 
+            {/* ── Nota de aprobacion para usuarios no-admin ────────── */}
+            {isCreateMode && !isAdmin && (
+              <View style={[styles.approvalNote, { backgroundColor: '#f59e0b' + '15' }]}>
+                <MaterialCommunityIcons name="information-outline" size={18} color="#f59e0b" />
+                <Text
+                  variant="bodySmall"
+                  style={{ color: '#f59e0b', flex: 1, marginLeft: spacing.sm }}
+                >
+                  Tu movimiento sera enviado para aprobacion de un administrador antes de registrarse.
+                </Text>
+              </View>
+            )}
+
             {/* ── Boton de enviar ────────────────────────────────────── */}
             <View style={styles.submitSection}>
               <Button
@@ -696,9 +738,13 @@ export default function TransactionFormScreen() {
                 loading={isSubmitting}
                 disabled={isSubmitting || isDeleting}
                 onPress={handleSubmit}
-                icon={isCreateMode ? 'plus-circle-outline' : 'content-save-outline'}
+                icon={isCreateMode
+                  ? (isAdmin ? 'plus-circle-outline' : 'send-outline')
+                  : 'content-save-outline'}
               >
-                {isCreateMode ? 'Registrar Movimiento' : 'Guardar Cambios'}
+                {isCreateMode
+                  ? (isAdmin ? 'Registrar Movimiento' : 'Enviar para Aprobacion')
+                  : 'Guardar Cambios'}
               </Button>
             </View>
 
@@ -820,6 +866,13 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: spacing.xxs,
     fontSize: 12,
+  },
+  approvalNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.smd,
+    borderRadius: 10,
+    marginTop: spacing.xs,
   },
   submitSection: {
     marginTop: spacing.md,

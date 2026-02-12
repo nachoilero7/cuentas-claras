@@ -38,6 +38,7 @@ export interface TransactionFilters {
   status?: TransactionStatus;
   startDate?: string;
   endDate?: string;
+  createdBy?: string;
   limit?: number;
   offset?: number;
 }
@@ -73,6 +74,9 @@ export async function getTransactions(filters?: TransactionFilters) {
   if (filters?.status) {
     query = query.eq('status', filters.status);
   }
+  if (filters?.createdBy) {
+    query = query.eq('created_by', filters.createdBy);
+  }
   if (filters?.startDate) {
     query = query.gte('transaction_date', filters.startDate);
   }
@@ -103,8 +107,13 @@ export async function getTransactionById(id: string) {
 }
 
 // ─── Crear nueva transaccion ────────────────────────────────────────────────
+// Todas las transacciones se crean como 'pending' por defecto y requieren
+// aprobacion de un administrador. Los admins pueden crear con 'approved'.
 
-export async function createTransaction(transactionData: CreateTransactionData) {
+export async function createTransaction(
+  transactionData: CreateTransactionData,
+  status: TransactionStatus = 'pending',
+) {
   // Obtener el usuario autenticado para asignar created_by
   const {
     data: { user },
@@ -120,7 +129,7 @@ export async function createTransaction(transactionData: CreateTransactionData) 
     .insert({
       ...transactionData,
       created_by: user.id,
-      status: 'approved' as TransactionStatus, // Por ahora, aprobada por defecto
+      status,
     })
     .select(TRANSACTION_SELECT)
     .single();

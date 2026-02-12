@@ -147,6 +147,89 @@ export async function notifyBudgetThreshold(
   );
 }
 
+// ─── Obtener tokens de push de usuarios admin ──────────────────────────────
+
+export async function getAdminPushTokens(): Promise<string[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('push_token')
+    .eq('role', 'admin')
+    .eq('is_active', true)
+    .not('push_token', 'is', null);
+
+  return (data ?? [])
+    .map((p: any) => p.push_token as string)
+    .filter(Boolean);
+}
+
+// ─── Obtener token de push de un usuario especifico ────────────────────────
+
+export async function getUserPushToken(userId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('push_token')
+    .eq('id', userId)
+    .single();
+
+  return (data as any)?.push_token ?? null;
+}
+
+// ─── Enviar push notifications via Expo Push API ───────────────────────────
+
+async function sendExpoPush(
+  tokens: string[],
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+  channelId: string = 'approvals',
+) {
+  if (tokens.length === 0) return;
+
+  const messages = tokens.map((token) => ({
+    to: token,
+    title,
+    body,
+    data,
+    channelId,
+    sound: 'default' as const,
+  }));
+
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+  } catch (error) {
+    console.error('[Push] Error enviando push notifications:', error);
+  }
+}
+
+// ─── Notificar a todos los administradores ─────────────────────────────────
+
+export async function sendPushToAdmins(
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+) {
+  const tokens = await getAdminPushTokens();
+  await sendExpoPush(tokens, title, body, data);
+}
+
+// ─── Notificar a un usuario especifico ─────────────────────────────────────
+
+export async function sendPushToUser(
+  userId: string,
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+) {
+  const token = await getUserPushToken(userId);
+  if (token) {
+    await sendExpoPush([token], title, body, data);
+  }
+}
+
 // ─── Obtener cantidad de notificaciones en badge ───────────────────────────
 
 export async function getBadgeCount(): Promise<number> {
