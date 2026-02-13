@@ -129,7 +129,7 @@ export default function TransactionFormScreen() {
   })), [colors]);
 
   // Hooks de datos
-  const { data: transaction, isLoading: isTransactionLoading } = useTransaction(
+  const { data: transaction, isLoading: isTransactionLoading, error: transactionError } = useTransaction(
     isCreateMode ? '' : id!
   );
   const createTransaction = useCreateTransaction();
@@ -157,6 +157,7 @@ export default function TransactionFormScreen() {
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
   const hasUnsavedChanges = useRef(false);
+  const isSubmittingRef = useRef(false);
 
   // Marcar formulario como modificado cuando cambian los campos
   useEffect(() => {
@@ -306,7 +307,9 @@ export default function TransactionFormScreen() {
   // ── Enviar formulario ─────────────────────────────────────────────────────
 
   const handleSubmit = useCallback(async () => {
+    if (isSubmittingRef.current) return;
     if (!validate()) return;
+    isSubmittingRef.current = true;
 
     const parsedAmount = parseFloat(amount.replace(',', '.'));
     const parsedExchangeRate = exchangeRate.trim()
@@ -385,6 +388,8 @@ export default function TransactionFormScreen() {
       const message =
         err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
       Alert.alert('Error', message);
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [
     validate,
@@ -449,11 +454,7 @@ export default function TransactionFormScreen() {
   if (!isCreateMode && isTransactionLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Editar Movimiento',
-          }}
-        />
+        <Stack.Screen options={{ title: 'Editar Movimiento' }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text
@@ -462,6 +463,23 @@ export default function TransactionFormScreen() {
           >
             Cargando movimiento...
           </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isCreateMode && transactionError) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Error' }} />
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text variant="bodyMedium" style={{ color: colors.error, marginTop: spacing.sm }}>
+            No se pudo cargar el movimiento
+          </Text>
+          <Button variant="outline" onPress={() => router.back()} style={{ marginTop: spacing.md }}>
+            Volver
+          </Button>
         </View>
       </SafeAreaView>
     );

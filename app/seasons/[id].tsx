@@ -65,7 +65,7 @@ export default function SeasonFormScreen() {
 
   // ── Hooks de datos ────────────────────────────────────────────────────────
 
-  const { data: season, isLoading: isSeasonLoading } = useSeason(
+  const { data: season, isLoading: isSeasonLoading, error: seasonError } = useSeason(
     isCreateMode ? '' : id!
   );
   const createSeason = useCreateSeason();
@@ -266,11 +266,7 @@ export default function SeasonFormScreen() {
   if (!isCreateMode && isSeasonLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Editar Temporada',
-          }}
-        />
+        <Stack.Screen options={{ title: 'Editar Temporada' }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text
@@ -279,6 +275,23 @@ export default function SeasonFormScreen() {
           >
             Cargando temporada...
           </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isCreateMode && seasonError) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Error' }} />
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text variant="bodyMedium" style={{ color: colors.error, marginTop: spacing.sm }}>
+            No se pudo cargar la temporada
+          </Text>
+          <Button variant="outline" onPress={() => router.back()} style={{ marginTop: spacing.md }}>
+            Volver
+          </Button>
         </View>
       </SafeAreaView>
     );

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Text } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -72,7 +73,7 @@ export default function CategoryFormScreen() {
   const isAdmin = role === 'admin';
 
   // Hooks de datos
-  const { data: category, isLoading: isCategoryLoading } = useCategory(
+  const { data: category, isLoading: isCategoryLoading, error: categoryError } = useCategory(
     isCreateMode ? '' : id!
   );
   const createCategory = useCreateCategory();
@@ -272,11 +273,7 @@ export default function CategoryFormScreen() {
   if (!isCreateMode && isCategoryLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Editar Rubro',
-          }}
-        />
+        <Stack.Screen options={{ title: 'Editar Rubro' }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text
@@ -285,6 +282,23 @@ export default function CategoryFormScreen() {
           >
             Cargando rubro...
           </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isCreateMode && categoryError) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Error' }} />
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text variant="bodyMedium" style={{ color: colors.error, marginTop: spacing.sm }}>
+            No se pudo cargar el rubro
+          </Text>
+          <Button variant="outline" onPress={() => router.back()} style={{ marginTop: spacing.md }}>
+            Volver
+          </Button>
         </View>
       </SafeAreaView>
     );

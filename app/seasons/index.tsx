@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useSeasons } from '@/src/features/seasons/hooks/useSeasons';
 import { Card } from '@/src/shared/components/ui/Card';
@@ -113,7 +114,7 @@ export default function SeasonsListScreen() {
           variant="bodyMedium"
           style={{ color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }}
         >
-          {error instanceof Error ? error.message : 'Ocurrio un error inesperado.'}
+          {sanitizeErrorMessage(error)}
         </Text>
         <View style={{ marginTop: spacing.lg }}>
           <Button variant="primary" size="md" onPress={() => refetch()}>

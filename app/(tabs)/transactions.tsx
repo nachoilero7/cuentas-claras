@@ -16,6 +16,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { startOfWeek, startOfMonth, subMonths, format } from 'date-fns';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
+import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useTransactions } from '@/src/features/transactions/hooks/useTransactions';
@@ -216,7 +217,7 @@ export default function TransactionsScreen() {
           variant="bodyMedium"
           style={[styles.errorMessage, { color: colors.textSecondary }]}
         >
-          {error instanceof Error ? error.message : 'Ocurrio un error inesperado.'}
+          {sanitizeErrorMessage(error)}
         </Text>
         <Button variant="primary" size="md" onPress={handleRefresh} icon="refresh">
           Reintentar

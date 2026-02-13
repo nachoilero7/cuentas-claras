@@ -39,23 +39,28 @@ const MUTATION_DESCRIPTIONS: Record<OfflineMutation['type'], string> = {
 
 // ── Mapeo de tipo de mutacion a query keys para invalidar ───────────────────
 
+// Keys financieras compartidas (deben coincidir con invalidateFinancialData)
+const FINANCIAL_KEYS: string[][] = [
+  ['transactions'], ['dashboard'], ['report-summary'], ['category-report'], ['budget-status'],
+];
+
 const MUTATION_QUERY_KEYS: Record<string, string[][]> = {
-  create_transaction: [['transactions'], ['reports'], ['category-balances']],
-  update_transaction: [['transactions'], ['reports'], ['category-balances']],
-  delete_transaction: [['transactions'], ['reports'], ['category-balances']],
+  create_transaction: [...FINANCIAL_KEYS, ['approvals']],
+  update_transaction: [...FINANCIAL_KEYS, ['approvals']],
+  delete_transaction: [...FINANCIAL_KEYS, ['approvals']],
   create_category: [['categories']],
-  update_category: [['categories'], ['category-balances']],
-  delete_category: [['categories'], ['transactions'], ['dashboard']],
+  update_category: [['categories'], ...FINANCIAL_KEYS, ['budget-alerts']],
+  delete_category: [['categories'], ...FINANCIAL_KEYS, ['budget-alerts']],
   create_season: [['seasons']],
   update_season: [['seasons']],
-  delete_season: [['seasons']],
-  approve_request: [['approvals'], ['transactions']],
-  reject_request: [['approvals'], ['transactions']],
+  delete_season: [['seasons'], ['current-season'], ['categories'], ...FINANCIAL_KEYS, ['recurring'], ['budget-alerts'], ['approvals']],
+  approve_request: [['approvals'], ...FINANCIAL_KEYS],
+  reject_request: [['approvals'], ...FINANCIAL_KEYS],
   create_recurring: [['recurring']],
   update_recurring: [['recurring']],
   delete_recurring: [['recurring']],
-  upsert_budget_alert: [['budget-alerts']],
-  delete_budget_alert: [['budget-alerts']],
+  upsert_budget_alert: [['budget-alerts'], ['budget-status']],
+  delete_budget_alert: [['budget-alerts'], ['budget-status']],
 };
 
 // ── Procesar una mutacion individual ─────────────────────────────────────────

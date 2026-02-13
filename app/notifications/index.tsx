@@ -13,6 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 import {
   useNotifications,
   useUnreadCount,
@@ -199,9 +200,7 @@ export default function NotificationsScreen() {
           variant="bodyMedium"
           style={{ color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }}
         >
-          {error instanceof Error
-            ? error.message
-            : 'Ocurrio un error inesperado.'}
+          {sanitizeErrorMessage(error)}
         </Text>
         <View style={{ marginTop: spacing.lg }}>
           <Button variant="primary" size="md" onPress={handleRefresh}>

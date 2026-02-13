@@ -129,7 +129,7 @@ export default function RecurringFormScreen() {
   const isCreateMode = id === 'new';
 
   // Hooks de datos
-  const { data: recurringItems, isLoading: isRecurringLoading } = useRecurringTransactions();
+  const { data: recurringItems, isLoading: isRecurringLoading, error: recurringError } = useRecurringTransactions();
   const createRecurring = useCreateRecurring();
   const updateRecurring = useUpdateRecurring();
   const deleteRecurring = useDeleteRecurring();
@@ -369,11 +369,7 @@ export default function RecurringFormScreen() {
   if (!isCreateMode && isRecurringLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Editar Recurrente',
-          }}
-        />
+        <Stack.Screen options={{ title: 'Editar Recurrente' }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text
@@ -382,6 +378,23 @@ export default function RecurringFormScreen() {
           >
             Cargando recurrente...
           </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isCreateMode && recurringError) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Error' }} />
+        <View style={styles.loadingContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text variant="bodyMedium" style={{ color: colors.error, marginTop: spacing.sm }}>
+            No se pudo cargar el recurrente
+          </Text>
+          <Button variant="outline" onPress={() => router.back()} style={{ marginTop: spacing.md }}>
+            Volver
+          </Button>
         </View>
       </SafeAreaView>
     );

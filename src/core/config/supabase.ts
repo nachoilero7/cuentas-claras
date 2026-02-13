@@ -41,8 +41,15 @@ const supabaseAnonKey =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
   '';
 
-// Placeholder URL para que el cliente no falle durante desarrollo sin .env
-// La app mostrara un mensaje de error apropiado en la UI si no puede conectarse
+// En produccion, la app DEBE tener las credenciales configuradas
+if (!__DEV__ && (!supabaseUrl || !supabaseAnonKey)) {
+  throw new Error(
+    'Credenciales de Supabase no configuradas. ' +
+      'Configura EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_ANON_KEY antes de publicar.'
+  );
+}
+
+// Placeholder solo para desarrollo sin .env (permite que metro bundle sin crashear)
 const PLACEHOLDER_URL = 'https://placeholder.supabase.co';
 const PLACEHOLDER_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
 

@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
 import { Card } from '@/src/shared/components/ui/Card';
@@ -83,7 +84,7 @@ export default function CategoriesScreen() {
           variant="bodyMedium"
           style={[styles.errorMessage, { color: colors.textSecondary }]}
         >
-          {error instanceof Error ? error.message : 'Ocurrio un error inesperado.'}
+          {sanitizeErrorMessage(error)}
         </Text>
         <Button variant="primary" size="md" onPress={handleRefresh} icon="refresh">
           Reintentar

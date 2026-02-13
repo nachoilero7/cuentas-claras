@@ -156,7 +156,9 @@ function RecurringCard({ item, colors, onToggle, onDelete, onEdit }: RecurringCa
   const typeColor = colors[item.type as 'income' | 'expense' | 'transfer'];
   const typeIcon = TYPE_ICONS[item.type];
   const nextDate = new Date(item.next_execution);
-  const formattedDate = `${nextDate.getDate().toString().padStart(2, '0')}/${(nextDate.getMonth() + 1).toString().padStart(2, '0')}/${nextDate.getFullYear()}`;
+  const formattedDate = isNaN(nextDate.getTime())
+    ? 'Fecha invalida'
+    : `${nextDate.getDate().toString().padStart(2, '0')}/${(nextDate.getMonth() + 1).toString().padStart(2, '0')}/${nextDate.getFullYear()}`;
 
   return (
     <Card
