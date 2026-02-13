@@ -71,7 +71,7 @@ export function ImageViewer({
       const response = await fetch(imageUrl);
       const blob = await response.blob();
       const buffer = await blob.arrayBuffer();
-      tempFile.write(new Uint8Array(buffer));
+      await tempFile.write(new Uint8Array(buffer));
 
       await Sharing.shareAsync(tempFile.uri);
     } catch (error) {
@@ -145,6 +145,7 @@ export function ImageViewer({
                 resizeMode="contain"
                 onLoadStart={() => setImageLoading(true)}
                 onLoadEnd={() => setImageLoading(false)}
+                onError={() => setImageLoading(false)}
               />
             ) : null}
           </View>

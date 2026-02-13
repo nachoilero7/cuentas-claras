@@ -58,12 +58,16 @@ function AttachmentThumbnail({
 
   useEffect(() => {
     let mounted = true;
-    getAttachmentUrl(attachment.file_path).then((url) => {
-      if (mounted) {
-        setSignedUrl(url);
-        setLoading(false);
-      }
-    });
+    getAttachmentUrl(attachment.file_path)
+      .then((url) => {
+        if (mounted) {
+          setSignedUrl(url);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
     return () => { mounted = false; };
   }, [attachment.file_path]);
 
