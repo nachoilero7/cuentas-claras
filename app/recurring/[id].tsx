@@ -15,6 +15,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
+import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
@@ -160,9 +161,14 @@ export default function RecurringFormScreen() {
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
   const hasUnsavedChanges = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // Marcar formulario como modificado cuando cambian los campos
+  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     hasUnsavedChanges.current = true;
   }, [type, amount, currency, description, notes, categoryId, frequency, startDate, endDate, paymentMethod]);
 
@@ -294,17 +300,23 @@ export default function RecurringFormScreen() {
 
     try {
       if (isCreateMode) {
-        await createRecurring.mutateAsync(payload);
+        const result = await createRecurring.mutateAsync(payload);
         hasUnsavedChanges.current = false;
-        showSnackbar('Recurrente creada exitosamente', 'success');
+        if (result) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Recurrente creada exitosamente', 'success');
+        }
         router.back();
       } else {
-        await updateRecurring.mutateAsync({
+        const result = await updateRecurring.mutateAsync({
           id: id!,
           updates: payload,
         });
         hasUnsavedChanges.current = false;
-        showSnackbar('Recurrente actualizada exitosamente', 'success');
+        if (result) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Recurrente actualizada exitosamente', 'success');
+        }
         router.back();
       }
     } catch {
@@ -435,7 +447,7 @@ export default function RecurringFormScreen() {
               >
                 Tipo de movimiento
               </Text>
-              <View style={styles.typeSelector}>
+              <View style={styles.typeSelector} accessibilityRole="radiogroup">
                 {TYPE_OPTIONS.map((option) => {
                   const isSelected = type === option.key;
                   return (
@@ -452,6 +464,9 @@ export default function RecurringFormScreen() {
                         },
                       ]}
                       onPress={() => setType(option.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={option.label}
                     >
                       <View
                         style={[
@@ -613,7 +628,7 @@ export default function RecurringFormScreen() {
               >
                 Metodo de pago
               </Text>
-              <View style={styles.paymentMethodGrid}>
+              <View style={styles.paymentMethodGrid} accessibilityRole="radiogroup">
                 {PAYMENT_METHOD_OPTIONS.map((option) => {
                   const isSelected = paymentMethod === option.key;
                   return (
@@ -630,6 +645,9 @@ export default function RecurringFormScreen() {
                         },
                       ]}
                       onPress={() => setPaymentMethod(option.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={option.label}
                     >
                       <MaterialCommunityIcons
                         name={option.icon as any}

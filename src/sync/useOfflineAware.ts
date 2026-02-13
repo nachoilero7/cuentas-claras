@@ -1,9 +1,9 @@
 import { useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 
 import { enqueueMutation } from './offlineQueue';
 import type { OfflineMutation } from './offlineQueue';
+import { showSnackbar } from '@/src/shared/lib/snackbar';
 
 /** Esperar a que el lock se libere (max ~5s) antes de continuar */
 function waitForLock(ref: React.MutableRefObject<boolean>, maxMs = 5000): Promise<void> {
@@ -56,10 +56,7 @@ export function useOfflineAware() {
 
             if (isNetworkError) {
               await enqueueMutation({ type: mutationType, payload });
-              Alert.alert(
-                'Guardado offline',
-                'No hay conexion. El cambio se sincronizara automaticamente cuando vuelvas a conectarte.',
-              );
+              showSnackbar('Guardado localmente. Se sincronizara cuando haya conexion.', 'info');
               return { result: null, queued: true };
             }
 
@@ -69,10 +66,7 @@ export function useOfflineAware() {
 
         // Offline: encolar
         await enqueueMutation({ type: mutationType, payload });
-        Alert.alert(
-          'Guardado offline',
-          'No hay conexion. El cambio se sincronizara automaticamente cuando vuelvas a conectarte.',
-        );
+        showSnackbar('Guardado localmente. Se sincronizara cuando haya conexion.', 'info');
         return { result: null, queued: true };
       } finally {
         isCheckingRef.current = false;

@@ -14,6 +14,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
+import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
@@ -94,9 +95,14 @@ export default function CategoryFormScreen() {
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
   const hasUnsavedChanges = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // Marcar formulario como modificado cuando cambian los campos
+  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     hasUnsavedChanges.current = true;
   }, [name, description, icon, color, budgetArs, budgetUsd]);
 
@@ -206,14 +212,20 @@ export default function CategoryFormScreen() {
 
     try {
       if (isCreateMode) {
-        await createCategory.mutateAsync(payload);
+        const result = await createCategory.mutateAsync(payload);
         hasUnsavedChanges.current = false;
-        showSnackbar('Rubro creado exitosamente', 'success');
+        if (result) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Rubro creado exitosamente', 'success');
+        }
         router.back();
       } else {
-        await updateCategory.mutateAsync({ id: id!, ...payload });
+        const result = await updateCategory.mutateAsync({ id: id!, ...payload });
         hasUnsavedChanges.current = false;
-        showSnackbar('Rubro actualizado exitosamente', 'success');
+        if (result) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Rubro actualizado exitosamente', 'success');
+        }
         router.back();
       }
     } catch {

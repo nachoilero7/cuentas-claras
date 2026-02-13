@@ -15,6 +15,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
+import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
@@ -158,9 +159,14 @@ export default function TransactionFormScreen() {
   const navigation = useNavigation();
   const hasUnsavedChanges = useRef(false);
   const isSubmittingRef = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // Marcar formulario como modificado cuando cambian los campos
+  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     hasUnsavedChanges.current = true;
   }, [type, amount, currency, exchangeRate, description, notes, categoryId, transferToCategoryId, transactionDate, paymentMethod, pendingImages]);
 
@@ -371,17 +377,27 @@ export default function TransactionFormScreen() {
           );
 
           hasUnsavedChanges.current = false;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Movimiento enviado para aprobacion', 'success');
           router.back();
-        } else {
+        } else if (result) {
           hasUnsavedChanges.current = false;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Movimiento registrado exitosamente', 'success');
           router.back();
         }
+        // result === null → encolado offline, snackbar ya mostrado por useOfflineAware
+        if (!result) {
+          hasUnsavedChanges.current = false;
+          router.back();
+        }
       } else {
-        await updateTransaction.mutateAsync({ id: id!, ...payload });
+        const updateResult = await updateTransaction.mutateAsync({ id: id!, ...payload });
         hasUnsavedChanges.current = false;
-        showSnackbar('Movimiento actualizado exitosamente', 'success');
+        if (updateResult) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Movimiento actualizado exitosamente', 'success');
+        }
         router.back();
       }
     } catch {
@@ -521,7 +537,7 @@ export default function TransactionFormScreen() {
                 >
                   Tipo de movimiento
                 </Text>
-                <View style={styles.typeSelector}>
+                <View style={styles.typeSelector} accessibilityRole="radiogroup">
                   {TYPE_OPTIONS.map((option) => {
                     const isSelected = type === option.key;
                     return (
@@ -538,6 +554,9 @@ export default function TransactionFormScreen() {
                           },
                         ]}
                         onPress={() => setType(option.key)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: isSelected }}
+                        accessibilityLabel={option.label}
                       >
                         <View
                           style={[
@@ -704,7 +723,7 @@ export default function TransactionFormScreen() {
               >
                 Metodo de pago
               </Text>
-              <View style={styles.paymentMethodGrid}>
+              <View style={styles.paymentMethodGrid} accessibilityRole="radiogroup">
                 {PAYMENT_METHOD_OPTIONS.map((option) => {
                   const isSelected = paymentMethod === option.key;
                   return (
@@ -721,6 +740,9 @@ export default function TransactionFormScreen() {
                         },
                       ]}
                       onPress={() => setPaymentMethod(option.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={option.label}
                     >
                       <MaterialCommunityIcons
                         name={option.icon as keyof typeof MaterialCommunityIcons.glyphMap}

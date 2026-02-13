@@ -57,7 +57,7 @@ interface SummaryCardProps {
   secondaryTextColor?: string;
 }
 
-function SummaryCard({
+const SummaryCard = React.memo(function SummaryCard({
   label,
   amount,
   amountUsd,
@@ -101,7 +101,7 @@ function SummaryCard({
       )}
     </View>
   );
-}
+});
 
 // ── Componente: Barra horizontal del grafico mensual ───────────────────────────
 
@@ -114,7 +114,7 @@ interface MonthBarProps {
   expenseColor: string;
 }
 
-function MonthBar({ label, income, expenses, maxValue, incomeColor, expenseColor }: MonthBarProps) {
+const MonthBar = React.memo(function MonthBar({ label, income, expenses, maxValue, incomeColor, expenseColor }: MonthBarProps) {
   const incomeWidth = maxValue > 0 ? (income / maxValue) * 100 : 0;
   const expenseWidth = maxValue > 0 ? (expenses / maxValue) * 100 : 0;
 
@@ -159,7 +159,7 @@ function MonthBar({ label, income, expenses, maxValue, incomeColor, expenseColor
       </View>
     </View>
   );
-}
+});
 
 // ── Componente: Fila de categoria con barra de progreso ────────────────────────
 
@@ -176,7 +176,7 @@ interface CategoryRowProps {
   onPress?: () => void;
 }
 
-function CategoryRow({
+const CategoryRow = React.memo(function CategoryRow({
   name,
   amount,
   percentage,
@@ -247,7 +247,7 @@ function CategoryRow({
       </View>
     </Pressable>
   );
-}
+});
 
 // ── Componente principal: Dashboard ────────────────────────────────────────────
 

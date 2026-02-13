@@ -16,6 +16,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
+import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
@@ -89,9 +90,14 @@ export default function SeasonFormScreen() {
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
   const hasUnsavedChanges = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // Marcar formulario como modificado cuando cambian los campos
+  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     hasUnsavedChanges.current = true;
   }, [name, description, startDate, endDate, status, isCurrent]);
 
@@ -183,12 +189,15 @@ export default function SeasonFormScreen() {
 
     try {
       if (isCreateMode) {
-        await createSeason.mutateAsync(payload);
+        const result = await createSeason.mutateAsync(payload);
         hasUnsavedChanges.current = false;
-        showSnackbar('Temporada creada exitosamente', 'success');
+        if (result) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Temporada creada exitosamente', 'success');
+        }
         router.back();
       } else {
-        await updateSeason.mutateAsync({ id: id!, updates: payload });
+        const result = await updateSeason.mutateAsync({ id: id!, updates: payload });
 
         // Si se marco como temporada actual, actualizar tambien
         if (isCurrent && !season?.is_current) {
@@ -196,7 +205,10 @@ export default function SeasonFormScreen() {
         }
 
         hasUnsavedChanges.current = false;
-        showSnackbar('Temporada actualizada exitosamente', 'success');
+        if (result) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showSnackbar('Temporada actualizada exitosamente', 'success');
+        }
         router.back();
       }
     } catch {
@@ -377,7 +389,7 @@ export default function SeasonFormScreen() {
               >
                 Estado
               </Text>
-              <View style={styles.statusRow}>
+              <View style={styles.statusRow} accessibilityRole="radiogroup">
                 {STATUS_OPTIONS.map((option) => {
                   const isSelected = status === option.value;
                   return (
@@ -392,6 +404,9 @@ export default function SeasonFormScreen() {
                         },
                       ]}
                       onPress={() => setStatus(option.value)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={option.label}
                     >
                       <MaterialCommunityIcons
                         name={option.icon as keyof typeof MaterialCommunityIcons.glyphMap}

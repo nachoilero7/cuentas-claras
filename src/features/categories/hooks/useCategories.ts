@@ -135,13 +135,22 @@ export function useUpdateCategory() {
         queryClient.setQueryData(['category', context.id], context.previousCategory);
       }
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (_data, variables, context) => {
       // Invalidar la lista y el detalle de la categoria actualizada
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       queryClient.invalidateQueries({ queryKey: ['category', variables.id] });
-      // Cambios en presupuesto/nombre afectan datos financieros
-      invalidateFinancialData(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
+
+      // Solo invalidar datos financieros si cambio el presupuesto
+      // (nombre/icono/color/descripcion no afectan saldos ni reportes)
+      const prev = context?.previousCategory;
+      const budgetChanged = !prev
+        || prev.budget_limit_ars !== (variables.budget_limit_ars ?? null)
+        || prev.budget_limit_usd !== (variables.budget_limit_usd ?? null);
+
+      if (budgetChanged) {
+        invalidateFinancialData(queryClient);
+        queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
+      }
     },
   });
 }
