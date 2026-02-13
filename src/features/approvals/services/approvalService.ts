@@ -143,7 +143,7 @@ export async function approveRequest(id: string, comment?: string) {
       })
       .eq('id', id);
 
-    throw error;
+    return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
   }
 
   return { data: typedApproval, error: null };
@@ -230,7 +230,7 @@ export async function rejectRequest(id: string, comment: string) {
       })
       .eq('id', id);
 
-    throw error;
+    return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
   }
 
   return { data: typedApproval, error: null };

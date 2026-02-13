@@ -5,6 +5,7 @@ export {
   deleteRecurringTransaction,
   toggleRecurringTransaction,
   calculateNextExecution,
+  executeOverdueRecurring,
 } from './recurringService';
 
 export type {

@@ -63,8 +63,14 @@ export async function uploadAttachment(
   const file = new ExpoFile(uri);
   const arrayBuffer = await file.arrayBuffer();
 
+  // Sanitizar filename contra path traversal
+  const safeName = fileName
+    .replace(/\.\./g, '')
+    .replace(/[\/\\]/g, '')
+    .replace(/^\./g, '') || 'file';
+
   // Ruta dentro del bucket: {userId}/{transactionId}/{fileName}
-  const filePath = `${user.id}/${transactionId}/${fileName}`;
+  const filePath = `${user.id}/${transactionId}/${safeName}`;
 
   // Subir el archivo al bucket 'receipts'
   const { error: uploadError } = await supabase.storage

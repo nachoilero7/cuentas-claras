@@ -248,9 +248,26 @@ export default function ApprovalsListScreen() {
 
   const renderPendingItem = ({ item }: { item: ApprovalWithDetails }) => {
     const tx = item.transaction;
-    const amountColor = tx?.type === 'income' ? colors.income : tx?.type === 'expense' ? colors.expense : tx?.type === 'transfer' ? colors.transfer : colors.textSecondary;
-    const formattedAmount = formatCurrency(tx?.amount ?? 0, (tx?.currency as CurrencyCode) ?? 'ARS');
-    const formattedDate = tx?.transaction_date ? formatDate(tx.transaction_date) : '';
+
+    // Guard: transaccion eliminada
+    if (!tx) {
+      return (
+        <Card variant="outlined" padding="md" style={{ marginBottom: spacing.smd }}>
+          <View style={styles.cardContent}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <MaterialCommunityIcons name="alert-outline" size={20} color={colors.textTertiary} />
+              <Text variant="bodyMedium" style={{ color: colors.textTertiary }}>
+                Transaccion eliminada
+              </Text>
+            </View>
+          </View>
+        </Card>
+      );
+    }
+
+    const amountColor = tx.type === 'income' ? colors.income : tx.type === 'expense' ? colors.expense : tx.type === 'transfer' ? colors.transfer : colors.textSecondary;
+    const formattedAmount = formatCurrency(tx.amount ?? 0, (tx.currency as CurrencyCode) ?? 'ARS');
+    const formattedDate = tx.transaction_date ? formatDate(tx.transaction_date) : '';
 
     const cardStyle: import('react-native').ViewStyle = {
       marginBottom: spacing.smd,
@@ -266,7 +283,7 @@ export default function ApprovalsListScreen() {
               style={{ color: colors.text, flex: 1, fontWeight: '600' }}
               numberOfLines={2}
             >
-              {tx?.description ?? 'Sin descripcion'}
+              {tx.description ?? 'Sin descripcion'}
             </Text>
             <Text
               variant="titleMedium"

@@ -14,6 +14,12 @@ import { CURRENCY_SYMBOLS } from '@/src/core/config/constants';
  * @returns Cadena formateada con simbolo de moneda
  */
 export function formatCurrency(amount: number, currency: CurrencyCode = 'ARS'): string {
+  // Guard: NaN, Infinity, undefined, null -> mostrar como $0
+  if (!isFinite(amount) || isNaN(amount)) {
+    const symbol = CURRENCY_SYMBOLS[currency] ?? '$';
+    return `${symbol} 0,00`;
+  }
+
   const symbol = CURRENCY_SYMBOLS[currency] ?? '$';
   const isNegative = amount < 0;
   const absoluteAmount = Math.abs(amount);

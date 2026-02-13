@@ -91,22 +91,9 @@ export async function updateSeason(id: string, updates: UpdateSeasonData) {
 // ── Establecer temporada actual ─────────────────────────────────────────────
 
 export async function setCurrentSeason(id: string) {
-  // Primero desmarcar todas las temporadas como no actuales
-  const { error: resetError } = await supabase
-    .from('seasons')
-    .update({ is_current: false })
-    .neq('id', '');
-
-  if (resetError) {
-    return { data: null, error: resetError };
-  }
-
-  // Luego marcar la temporada indicada como actual
+  // Operacion atomica via RPC para evitar race conditions
   const { data, error } = await supabase
-    .from('seasons')
-    .update({ is_current: true })
-    .eq('id', id)
-    .select()
+    .rpc('set_current_season', { p_season_id: id })
     .single();
 
   return { data: data as Season | null, error };

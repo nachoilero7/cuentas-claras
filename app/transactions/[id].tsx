@@ -318,7 +318,7 @@ export default function TransactionFormScreen() {
       currency,
       exchange_rate: parsedExchangeRate,
       amount_in_ars: currency === 'USD' && parsedExchangeRate
-        ? parsedAmount * parsedExchangeRate
+        ? Math.round(parsedAmount * parsedExchangeRate * 100) / 100
         : currency === 'ARS'
           ? parsedAmount
           : null,
