@@ -10,6 +10,7 @@ import type { Session, User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/src/core/config/supabase';
 import { signInWithGoogle as googleSignIn } from '@/src/core/services/googleAuth';
 import { queryClient } from '@/src/core/config/queryClient';
+import { clearOfflineQueue } from '@/src/sync';
 
 // ─── Tipos del contexto ─────────────────────────────────────────────────────
 
@@ -135,6 +136,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const { error } = await supabase.auth.signOut();
       queryClient.clear();
+      // Limpiar cola offline para evitar que mutaciones del usuario anterior
+      // se sincronicen cuando otro usuario inicie sesion
+      await clearOfflineQueue();
       return { error };
     } catch (error) {
       if (__DEV__) console.error('[Auth] Error inesperado en signOut:', error);
