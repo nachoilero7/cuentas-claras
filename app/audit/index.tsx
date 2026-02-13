@@ -78,6 +78,11 @@ const AUDIT_TABLE_LABELS: Record<string, string> = {
   categories: 'Categorias',
   profiles: 'Perfiles',
   approval_requests: 'Aprobaciones',
+  seasons: 'Temporadas',
+  recurring_transactions: 'Recurrentes',
+  budget_alerts: 'Alertas presupuesto',
+  notifications: 'Notificaciones',
+  user_category_permissions: 'Permisos por rubro',
 };
 
 // ── Opciones de filtro ──────────────────────────────────────────────────────
@@ -96,6 +101,9 @@ const TABLE_FILTERS: { key: string; label: string }[] = [
   { key: 'transactions', label: 'Transacciones' },
   { key: 'categories', label: 'Categorias' },
   { key: 'profiles', label: 'Perfiles' },
+  { key: 'seasons', label: 'Temporadas' },
+  { key: 'recurring_transactions', label: 'Recurrentes' },
+  { key: 'approval_requests', label: 'Aprobaciones' },
 ];
 
 type DatePreset = 'all' | 'today' | 'week' | 'month' | 'quarter';

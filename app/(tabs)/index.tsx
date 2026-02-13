@@ -13,6 +13,7 @@ import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { CartesianChart, Bar, BarGroup } from 'victory-native';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -103,151 +104,7 @@ const SummaryCard = React.memo(function SummaryCard({
   );
 });
 
-// ── Componente: Barra horizontal del grafico mensual ───────────────────────────
-
-interface MonthBarProps {
-  label: string;
-  income: number;
-  expenses: number;
-  maxValue: number;
-  incomeColor: string;
-  expenseColor: string;
-}
-
-const MonthBar = React.memo(function MonthBar({ label, income, expenses, maxValue, incomeColor, expenseColor }: MonthBarProps) {
-  const incomeWidth = maxValue > 0 ? (income / maxValue) * 100 : 0;
-  const expenseWidth = maxValue > 0 ? (expenses / maxValue) * 100 : 0;
-
-  return (
-    <View style={styles.monthBarContainer}>
-      <Text variant="labelSmall" style={styles.monthLabel} numberOfLines={1}>
-        {label}
-      </Text>
-      <View style={styles.monthBarsWrapper}>
-        {/* Barra de ingresos */}
-        <View style={styles.barRow}>
-          <View
-            style={[
-              styles.bar,
-              {
-                width: `${Math.max(incomeWidth, 1)}%`,
-                backgroundColor: incomeColor,
-                opacity: income > 0 ? 1 : 0.2,
-              },
-            ]}
-          />
-          <Text variant="labelSmall" style={[styles.barAmount, { color: incomeColor }]}>
-            {income > 0 ? formatCurrency(income) : ''}
-          </Text>
-        </View>
-        {/* Barra de egresos */}
-        <View style={styles.barRow}>
-          <View
-            style={[
-              styles.bar,
-              {
-                width: `${Math.max(expenseWidth, 1)}%`,
-                backgroundColor: expenseColor,
-                opacity: expenses > 0 ? 1 : 0.2,
-              },
-            ]}
-          />
-          <Text variant="labelSmall" style={[styles.barAmount, { color: expenseColor }]}>
-            {expenses > 0 ? formatCurrency(expenses) : ''}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-});
-
-// ── Componente: Fila de categoria con barra de progreso ────────────────────────
-
-interface CategoryRowProps {
-  name: string;
-  amount: number;
-  percentage: number;
-  color: string;
-  icon: string | null;
-  surfaceColor: string;
-  textColor: string;
-  secondaryTextColor: string;
-  defaultBarColor: string;
-  onPress?: () => void;
-}
-
-const CategoryRow = React.memo(function CategoryRow({
-  name,
-  amount,
-  percentage,
-  color,
-  icon,
-  surfaceColor,
-  textColor,
-  secondaryTextColor,
-  defaultBarColor,
-  onPress,
-}: CategoryRowProps) {
-  const barColor = color || defaultBarColor;
-
-  return (
-    <Pressable
-      style={styles.categoryRow}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${name}: ${formatCurrency(amount)}`}
-    >
-      <View style={styles.categoryHeader}>
-        <View style={styles.categoryNameRow}>
-          {icon ? (
-            <MaterialCommunityIcons
-              name={icon as keyof typeof MaterialCommunityIcons.glyphMap}
-              size={18}
-              color={barColor}
-              style={{ marginRight: spacing.xs }}
-            />
-          ) : (
-            <View
-              style={[
-                styles.categoryDot,
-                { backgroundColor: barColor },
-              ]}
-            />
-          )}
-          <Text
-            variant="bodyMedium"
-            style={{ color: textColor, flex: 1 }}
-            numberOfLines={1}
-          >
-            {name}
-          </Text>
-        </View>
-        <View style={styles.categoryAmountRow}>
-          <Text variant="bodySmall" style={{ color: secondaryTextColor }}>
-            {percentage.toFixed(1)}%
-          </Text>
-          <Text
-            variant="bodyMedium"
-            style={[styles.categoryAmount, { color: textColor }]}
-          >
-            {formatCurrency(amount)}
-          </Text>
-        </View>
-      </View>
-      <View style={[styles.categoryBarBg, { backgroundColor: surfaceColor }]}>
-        <View
-          style={[
-            styles.categoryBarFill,
-            {
-              width: `${Math.min(percentage, 100)}%`,
-              backgroundColor: barColor,
-            },
-          ]}
-        />
-      </View>
-    </Pressable>
-  );
-});
+// (Graficos Victory Native se renderizan inline en el dashboard)
 
 // ── Componente principal: Dashboard ────────────────────────────────────────────
 
@@ -304,14 +161,6 @@ export default function DashboardScreen() {
     ]);
     setRefreshing(false);
   }, [queryClient]);
-
-  // Calcular maximo para el grafico de barras mensuales
-  const monthlyMaxValue = useMemo(() => {
-    if (!monthlyData || monthlyData.length === 0) return 0;
-    return Math.max(
-      ...monthlyData.map((m) => Math.max(m.income, m.expenses))
-    );
-  }, [monthlyData]);
 
   // Calcular totales y porcentajes de categorias
   const categoryTotal = useMemo(() => {
@@ -626,18 +475,37 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={styles.chartContainer}>
-                {monthlyData.map((month) => (
-                  <MonthBar
-                    key={month.month}
-                    label={month.label}
-                    income={month.income}
-                    expenses={month.expenses}
-                    maxValue={monthlyMaxValue}
-                    incomeColor={colors.income}
-                    expenseColor={colors.expense}
-                  />
-                ))}
+              <View style={{ height: 220 }}>
+                <CartesianChart
+                  data={monthlyData as unknown as Record<string, unknown>[]}
+                  xKey={"label" as never}
+                  yKeys={["income", "expenses"] as never[]}
+                  domainPadding={{ left: 30, right: 30, top: 10 }}
+                  axisOptions={{
+                    labelColor: colors.textSecondary,
+                    lineColor: colors.outlineVariant,
+                  }}
+                >
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {({ points, chartBounds }: any) => (
+                    <BarGroup
+                      chartBounds={chartBounds}
+                      betweenGroupPadding={0.3}
+                      withinGroupPadding={0.1}
+                    >
+                      <BarGroup.Bar
+                        points={points.income}
+                        color={colors.income}
+                        animate={{ type: 'spring' }}
+                      />
+                      <BarGroup.Bar
+                        points={points.expenses}
+                        color={colors.expense}
+                        animate={{ type: 'spring' }}
+                      />
+                    </BarGroup>
+                  )}
+                </CartesianChart>
               </View>
             )}
           </Card>
@@ -677,25 +545,80 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={styles.categoryList}>
-                {categoryData.map((cat) => (
-                  <CategoryRow
-                    key={cat.category_id}
-                    name={cat.category_name}
-                    amount={cat.total_ars}
-                    percentage={categoryTotal > 0 ? ((cat.total_ars ?? 0) / categoryTotal) * 100 : 0}
-                    color={cat.color ?? colors.expense}
-                    icon={cat.icon}
-                    surfaceColor={colors.surfaceVariant}
-                    textColor={colors.text}
-                    secondaryTextColor={colors.textSecondary}
-                    defaultBarColor={colors.expense}
-                    onPress={() => router.push({
-                      pathname: '/(tabs)/transactions',
-                      params: { categoryId: cat.category_id, type: 'expense' },
-                    })}
-                  />
-                ))}
+              <View style={{ height: Math.max(180, categoryData.length * 44) }}>
+                <CartesianChart
+                  data={categoryData.map((cat) => ({
+                    category_name: cat.category_name,
+                    total_ars: cat.total_ars ?? 0,
+                  })) as unknown as Record<string, unknown>[]}
+                  xKey={"category_name" as never}
+                  yKeys={["total_ars"] as never[]}
+                  domainPadding={{ left: 10, right: 10, top: 10 }}
+                  axisOptions={{
+                    labelColor: colors.textSecondary,
+                    lineColor: colors.outlineVariant,
+                  }}
+                >
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {({ points, chartBounds }: any) => (
+                    <Bar
+                      points={points.total_ars}
+                      chartBounds={chartBounds}
+                      color={colors.expense}
+                      animate={{ type: 'spring' }}
+                      roundedCorners={{ topLeft: 4, topRight: 4 }}
+                    />
+                  )}
+                </CartesianChart>
+              </View>
+            )}
+
+            {/* Leyenda de categorias (clickeable) */}
+            {categoryData && categoryData.length > 0 && (
+              <View style={styles.categoryLegend}>
+                {categoryData.map((cat) => {
+                  const pct = categoryTotal > 0
+                    ? ((cat.total_ars ?? 0) / categoryTotal) * 100
+                    : 0;
+                  return (
+                    <Pressable
+                      key={cat.category_id}
+                      style={styles.categoryLegendItem}
+                      onPress={() => router.push({
+                        pathname: '/(tabs)/transactions',
+                        params: { categoryId: cat.category_id, type: 'expense' },
+                      })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${cat.category_name}: ${formatCurrency(cat.total_ars)}`}
+                    >
+                      <View
+                        style={[
+                          styles.categoryLegendDot,
+                          { backgroundColor: cat.color ?? colors.expense },
+                        ]}
+                      />
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: colors.text, flex: 1 }}
+                        numberOfLines={1}
+                      >
+                        {cat.category_name}
+                      </Text>
+                      <Text
+                        variant="labelSmall"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {pct.toFixed(1)}%
+                      </Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: colors.text, fontWeight: '600', marginLeft: spacing.xs }}
+                      >
+                        {formatCurrency(cat.total_ars)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
           </Card>
@@ -915,75 +838,21 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
 
-  // Barras mensuales
-  chartContainer: {
-    gap: spacing.smd,
+  // Leyenda de categorias
+  categoryLegend: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
   },
-  monthBarContainer: {
-    gap: spacing.xxs,
-  },
-  monthLabel: {
-    fontWeight: '600',
-    marginBottom: spacing.xxs,
-  },
-  monthBarsWrapper: {
-    gap: spacing.xxs,
-  },
-  barRow: {
+  categoryLegendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    paddingVertical: spacing.xxs,
   },
-  bar: {
-    height: 14,
-    borderRadius: 7,
-    minWidth: 4,
-  },
-  barAmount: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-
-  // Categorias
-  categoryList: {
-    gap: spacing.smd,
-  },
-  categoryRow: {
-    gap: spacing.xs,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  categoryNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  categoryDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: spacing.xs,
-  },
-  categoryAmountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  categoryAmount: {
-    fontWeight: '600',
-  },
-  categoryBarBg: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  categoryBarFill: {
-    height: '100%',
-    borderRadius: 4,
+  categoryLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 
   // Seccion informativa (no-admin)

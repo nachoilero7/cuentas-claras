@@ -26,6 +26,7 @@ export interface Profile {
   phone: string | null;
   payment_alias: string | null;
   is_active: boolean;
+  has_completed_onboarding: boolean;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;

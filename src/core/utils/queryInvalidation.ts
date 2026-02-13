@@ -27,6 +27,7 @@ export const TABLE_QUERY_KEY_MAP: Record<string, string[][]> = {
   recurring_transactions: [['recurring']],
   budget_alerts: [['budget-alerts']],
   notifications: [['notifications']],
+  user_category_permissions: [['permissions'], ['users']],
 };
 
 /**

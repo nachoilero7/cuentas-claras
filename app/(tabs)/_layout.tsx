@@ -93,6 +93,11 @@ export default function TabsLayout() {
     return true;
   };
 
+  // Redirigir a onboarding si el usuario no lo completo
+  if (!isLoading && isAuthenticated && profile && !profile.has_completed_onboarding) {
+    return <Redirect href="/onboarding" />;
+  }
+
   // Mostrar un indicador de carga mientras se verifica la sesion
   if (isLoading) {
     return (
