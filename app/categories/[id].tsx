@@ -32,6 +32,7 @@ import { spacing } from '@/src/shared/theme';
 const categorySchema = z.object({
   name: z
     .string()
+    .trim()
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(100, 'El nombre no puede exceder 100 caracteres'),
   description: z

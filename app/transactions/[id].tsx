@@ -88,6 +88,7 @@ const transactionSchema = z.object({
   exchange_rate: z.string().optional(),
   description: z
     .string()
+    .trim()
     .min(2, 'La descripcion debe tener al menos 2 caracteres')
     .max(200, 'La descripcion no puede exceder 200 caracteres'),
   notes: z
@@ -394,6 +395,7 @@ export default function TransactionFormScreen() {
     isAdmin,
     id,
     profile,
+    paymentMethod,
     pendingImages,
     createTransaction,
     createApproval,

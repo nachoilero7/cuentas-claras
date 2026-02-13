@@ -22,7 +22,7 @@ export function useBudgetAlertDispatch() {
 
         if (notified > 0) {
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
-          queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
+          queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
         }
       } catch (err) {
         if (__DEV__) console.warn('[BudgetAlertDispatch] Error:', err);

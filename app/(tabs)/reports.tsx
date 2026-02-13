@@ -756,7 +756,7 @@ export default function ReportsScreen() {
           icon="file-excel-outline"
           onPress={handleExport}
           loading={exportFetching}
-          disabled={exportFetching}
+          disabled={exportFetching || pdfExporting || !summary}
         >
           Exportar a Excel
         </Button>

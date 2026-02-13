@@ -8,7 +8,7 @@ import {
 } from '../services';
 import type { CreateRecurringInput } from '../services';
 
-const RECURRING_KEY = ['recurring-transactions'];
+const RECURRING_KEY = ['recurring'];
 
 export function useRecurringTransactions() {
   return useQuery({

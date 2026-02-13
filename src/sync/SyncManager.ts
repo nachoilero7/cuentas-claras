@@ -13,6 +13,9 @@ import type { OfflineMutation } from './offlineQueue';
 
 const MAX_RETRIES = 3;
 
+// ── Lock para evitar procesamiento concurrente de la cola ───────────────────
+let isProcessing = false;
+
 // ── Descripciones legibles para cada tipo de mutacion ────────────────────────
 
 const MUTATION_DESCRIPTIONS: Record<OfflineMutation['type'], string> = {
@@ -48,9 +51,9 @@ const MUTATION_QUERY_KEYS: Record<string, string[][]> = {
   delete_season: [['seasons']],
   approve_request: [['approvals'], ['transactions']],
   reject_request: [['approvals'], ['transactions']],
-  create_recurring: [['recurring-transactions']],
-  update_recurring: [['recurring-transactions']],
-  delete_recurring: [['recurring-transactions']],
+  create_recurring: [['recurring']],
+  update_recurring: [['recurring']],
+  delete_recurring: [['recurring']],
   upsert_budget_alert: [['budget-alerts']],
   delete_budget_alert: [['budget-alerts']],
 };
@@ -143,68 +146,80 @@ async function processMutation(mutation: OfflineMutation): Promise<boolean> {
 // ── Procesar toda la cola de mutaciones ──────────────────────────────────────
 
 export async function processOfflineQueue(queryClient: QueryClient): Promise<{ processed: number; failed: number }> {
-  const queue = await getOfflineQueue();
-
-  if (queue.length === 0) {
+  // Evitar procesamiento concurrente (ej: NetInfo + trigger manual simultaneos)
+  if (isProcessing) {
+    if (__DEV__) console.log('[SyncManager] Cola ya en proceso, omitiendo');
     return { processed: 0, failed: 0 };
   }
 
-  if (__DEV__) console.log(`[SyncManager] Procesando ${queue.length} mutaciones pendientes...`);
+  isProcessing = true;
 
-  let processed = 0;
-  let failed = 0;
-  const processedTypes = new Set<string>();
+  try {
+    const queue = await getOfflineQueue();
 
-  for (const mutation of queue) {
-    if (mutation.retryCount >= MAX_RETRIES) {
-      if (__DEV__) console.warn(`[SyncManager] Mutacion ${mutation.id} excedio max reintentos, descartando`);
-      await dequeueMutation(mutation.id);
-      failed += 1;
-
-      // Notificar al usuario que la mutacion se perdio
-      const description = MUTATION_DESCRIPTIONS[mutation.type] ?? mutation.type;
-      showSnackbar(
-        `No se pudo sincronizar: ${description}. Los datos se perdieron.`,
-        'error',
-      );
-
-      continue;
+    if (queue.length === 0) {
+      return { processed: 0, failed: 0 };
     }
 
-    const success = await processMutation(mutation);
+    if (__DEV__) console.log(`[SyncManager] Procesando ${queue.length} mutaciones pendientes...`);
 
-    if (success) {
-      await dequeueMutation(mutation.id);
-      processed += 1;
-      processedTypes.add(mutation.type);
-    } else {
-      await incrementRetryCount(mutation.id);
-      failed += 1;
-    }
-  }
+    let processed = 0;
+    let failed = 0;
+    const processedTypes = new Set<string>();
 
-  // Invalidar queries relevantes para refrescar datos despues de sincronizar
-  if (processed > 0) {
-    const keysToInvalidate = new Set<string>();
-    for (const type of processedTypes) {
-      const keys = MUTATION_QUERY_KEYS[type];
-      if (keys) {
-        for (const key of keys) {
-          keysToInvalidate.add(JSON.stringify(key));
-        }
+    for (const mutation of queue) {
+      if (mutation.retryCount >= MAX_RETRIES) {
+        if (__DEV__) console.warn(`[SyncManager] Mutacion ${mutation.id} excedio max reintentos, descartando`);
+        await dequeueMutation(mutation.id);
+        failed += 1;
+
+        // Notificar al usuario que la mutacion se perdio
+        const description = MUTATION_DESCRIPTIONS[mutation.type] ?? mutation.type;
+        showSnackbar(
+          `No se pudo sincronizar: ${description}. Los datos se perdieron.`,
+          'error',
+        );
+
+        continue;
+      }
+
+      const success = await processMutation(mutation);
+
+      if (success) {
+        await dequeueMutation(mutation.id);
+        processed += 1;
+        processedTypes.add(mutation.type);
+      } else {
+        await incrementRetryCount(mutation.id);
+        failed += 1;
       }
     }
 
-    const invalidations = Array.from(keysToInvalidate).map((k) =>
-      queryClient.invalidateQueries({ queryKey: JSON.parse(k) })
-    );
-    await Promise.all(invalidations);
+    // Invalidar queries relevantes para refrescar datos despues de sincronizar
+    if (processed > 0) {
+      const keysToInvalidate = new Set<string>();
+      for (const type of processedTypes) {
+        const keys = MUTATION_QUERY_KEYS[type];
+        if (keys) {
+          for (const key of keys) {
+            keysToInvalidate.add(JSON.stringify(key));
+          }
+        }
+      }
 
-    await persistQueryCache(queryClient);
-    if (__DEV__) console.log(`[SyncManager] Sincronizacion completada: ${processed} exitosas, ${failed} fallidas`);
+      const invalidations = Array.from(keysToInvalidate).map((k) =>
+        queryClient.invalidateQueries({ queryKey: JSON.parse(k) })
+      );
+      await Promise.all(invalidations);
+
+      await persistQueryCache(queryClient);
+      if (__DEV__) console.log(`[SyncManager] Sincronizacion completada: ${processed} exitosas, ${failed} fallidas`);
+    }
+
+    return { processed, failed };
+  } finally {
+    isProcessing = false;
   }
-
-  return { processed, failed };
 }
 
 // ── Iniciar el listener de reconexion ────────────────────────────────────────

@@ -110,16 +110,7 @@ export async function uploadAttachment(
 // ─── Eliminar adjunto del storage y de la tabla ──────────────────────────────
 
 export async function deleteAttachment(id: string, filePath: string) {
-  // Eliminar el archivo del bucket de Storage
-  const { error: storageError } = await supabase.storage
-    .from('receipts')
-    .remove([filePath]);
-
-  if (storageError) {
-    return { data: null, error: storageError };
-  }
-
-  // Eliminar el registro de la tabla
+  // Eliminar el registro de la tabla PRIMERO (si falla, el archivo sigue intacto)
   const { data, error } = await supabase
     .from('attachments')
     .delete()
@@ -127,7 +118,20 @@ export async function deleteAttachment(id: string, filePath: string) {
     .select()
     .single();
 
-  return { data: data as Attachment | null, error };
+  if (error) {
+    return { data: null, error };
+  }
+
+  // Eliminar el archivo del bucket de Storage (best-effort, el registro ya no existe)
+  const { error: storageError } = await supabase.storage
+    .from('receipts')
+    .remove([filePath]);
+
+  if (storageError && __DEV__) {
+    console.warn('[attachmentService] No se pudo eliminar archivo del storage:', filePath, storageError);
+  }
+
+  return { data: data as Attachment | null, error: null };
 }
 
 // ─── Obtener URL firmada para mostrar un adjunto (bucket privado) ────────────

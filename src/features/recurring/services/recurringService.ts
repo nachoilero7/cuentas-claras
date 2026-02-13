@@ -163,7 +163,7 @@ export async function executeOverdueRecurring(): Promise<{
   for (const rec of overdue as RecurringTransaction[]) {
     try {
       // Crear la transaccion correspondiente
-      const { error: insertError } = await supabase
+      const { data: insertedTx, error: insertError } = await supabase
         .from('transactions')
         .insert({
           type: rec.type,
@@ -178,7 +178,9 @@ export async function executeOverdueRecurring(): Promise<{
           created_by: user.id,
           status: 'pending',
           season_id: null,
-        });
+        })
+        .select('id')
+        .single();
 
       if (insertError) {
         errors.push(`${rec.description}: ${insertError.message}`);
@@ -196,7 +198,13 @@ export async function executeOverdueRecurring(): Promise<{
         .eq('id', rec.id);
 
       if (updateError) {
+        // Rollback: eliminar la transaccion recien creada para evitar
+        // que se duplique en la proxima ejecucion
+        if (insertedTx?.id) {
+          await supabase.from('transactions').delete().eq('id', insertedTx.id);
+        }
         errors.push(`Actualizar ${rec.description}: ${updateError.message}`);
+        continue;
       }
 
       executed++;

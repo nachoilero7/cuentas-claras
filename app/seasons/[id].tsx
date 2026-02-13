@@ -37,7 +37,7 @@ import type { SeasonStatus } from '@/src/core/types/database';
 // ── Esquema de validacion con Zod ───────────────────────────────────────────
 
 const seasonSchema = z.object({
-  name: z.string().min(1, 'El nombre es obligatorio'),
+  name: z.string().trim().min(1, 'El nombre es obligatorio'),
   description: z.string().nullable().optional(),
   start_date: z.string().min(1, 'La fecha de inicio es obligatoria'),
   end_date: z.string().nullable().optional(),
