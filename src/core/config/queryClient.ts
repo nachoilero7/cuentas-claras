@@ -1,5 +1,6 @@
 import { QueryClient, MutationCache } from '@tanstack/react-query';
 import { showSnackbar } from '@/src/shared/lib/snackbar';
+import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 
 const FIVE_MINUTES = 1000 * 60 * 5;
 const TEN_MINUTES = 1000 * 60 * 10;
@@ -20,9 +21,7 @@ export const queryClient = new QueryClient({
   },
   mutationCache: new MutationCache({
     onError: (error) => {
-      const message =
-        error instanceof Error ? error.message : 'Ocurrio un error inesperado.';
-      showSnackbar(message, 'error');
+      showSnackbar(sanitizeErrorMessage(error), 'error');
     },
   }),
 });

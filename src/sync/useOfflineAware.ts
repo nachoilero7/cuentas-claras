@@ -5,6 +5,20 @@ import NetInfo from '@react-native-community/netinfo';
 import { enqueueMutation } from './offlineQueue';
 import type { OfflineMutation } from './offlineQueue';
 
+/** Esperar a que el lock se libere (max ~5s) antes de continuar */
+function waitForLock(ref: React.MutableRefObject<boolean>, maxMs = 5000): Promise<void> {
+  if (!ref.current) return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      if (!ref.current || Date.now() - start >= maxMs) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 50);
+  });
+}
+
 /**
  * Hook que chequea conectividad antes de una mutacion.
  * Si esta offline, encola la mutacion y avisa al usuario.
@@ -19,10 +33,8 @@ export function useOfflineAware() {
       payload: Record<string, unknown>,
       onlineFn: () => Promise<T>,
     ): Promise<{ result: T | null; queued: boolean }> => {
-      // Evitar checks simultaneos
-      if (isCheckingRef.current) {
-        return { result: await onlineFn(), queued: false };
-      }
+      // Esperar a que termine el check anterior en vez de saltarlo
+      await waitForLock(isCheckingRef);
 
       isCheckingRef.current = true;
       try {

@@ -216,10 +216,8 @@ export default function CategoryFormScreen() {
         showSnackbar('Rubro actualizado exitosamente', 'success');
         router.back();
       }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-      Alert.alert('Error', message);
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
     }
   }, [
     validate,
@@ -251,10 +249,8 @@ export default function CategoryFormScreen() {
               await deleteCategory.mutateAsync(id!);
               showSnackbar('Rubro eliminado exitosamente', 'success');
               router.back();
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-              Alert.alert('Error', message);
+            } catch {
+              // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
             }
           },
         },

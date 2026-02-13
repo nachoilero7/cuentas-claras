@@ -137,9 +137,8 @@ export default function UserDetailScreen() {
     try {
       await updateRoleMutation.mutateAsync({ userId: id, role: selectedRole });
       Alert.alert('Rol actualizado', 'El rol del usuario se actualizo correctamente.');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-      Alert.alert('Error', message);
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
     }
   }, [id, selectedRole, updateRoleMutation]);
 
@@ -160,9 +159,8 @@ export default function UserDetailScreen() {
     try {
       await savePermissionsMutation.mutateAsync({ userId: id, permissions: payload });
       Alert.alert('Permisos guardados', 'Los permisos se guardaron correctamente.');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-      Alert.alert('Error', message);
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
     }
   }, [id, permissionsState, savePermissionsMutation]);
 
@@ -200,10 +198,9 @@ export default function UserDetailScreen() {
                 'Estado actualizado',
                 `El usuario fue ${newStatus ? 'activado' : 'desactivado'} correctamente.`,
               );
-            } catch (err) {
+            } catch {
               hapticError();
-              const message = err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-              Alert.alert('Error', message);
+              // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
             }
           },
         },

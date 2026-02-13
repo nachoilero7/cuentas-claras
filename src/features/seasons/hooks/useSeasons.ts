@@ -108,10 +108,11 @@ export function useSetCurrentSeason() {
       queryClient.invalidateQueries({ queryKey: ['seasons'] });
       queryClient.invalidateQueries({ queryKey: ['current-season'] });
       // Invalidar todos los datos que dependen de la temporada activa
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateFinancialData(queryClient);
       queryClient.invalidateQueries({ queryKey: ['recurring'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
     },
   });
 }

@@ -384,10 +384,8 @@ export default function TransactionFormScreen() {
         showSnackbar('Movimiento actualizado exitosamente', 'success');
         router.back();
       }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-      Alert.alert('Error', message);
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
     } finally {
       isSubmittingRef.current = false;
     }
@@ -433,10 +431,8 @@ export default function TransactionFormScreen() {
               await deleteTransaction.mutateAsync(id!);
               showSnackbar('Movimiento eliminado exitosamente', 'success');
               router.back();
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-              Alert.alert('Error', message);
+            } catch {
+              // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
             }
           },
         },

@@ -307,10 +307,8 @@ export default function RecurringFormScreen() {
         showSnackbar('Recurrente actualizada exitosamente', 'success');
         router.back();
       }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-      Alert.alert('Error', message);
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
     }
   }, [
     validate,
@@ -348,10 +346,8 @@ export default function RecurringFormScreen() {
               await deleteRecurring.mutateAsync(id!);
               showSnackbar('Recurrente eliminada exitosamente', 'success');
               router.back();
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-              Alert.alert('Error', message);
+            } catch {
+              // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
             }
           },
         },

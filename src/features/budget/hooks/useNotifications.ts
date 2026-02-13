@@ -35,6 +35,7 @@ export function useUnreadCount() {
     },
     staleTime: THIRTY_SECONDS,
     refetchInterval: ONE_MINUTE,
+    refetchIntervalInBackground: false,
   });
 }
 

@@ -199,10 +199,8 @@ export default function SeasonFormScreen() {
         showSnackbar('Temporada actualizada exitosamente', 'success');
         router.back();
       }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-      Alert.alert('Error', message);
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
     }
   }, [
     validate,
@@ -245,10 +243,8 @@ export default function SeasonFormScreen() {
               await deleteSeason.mutateAsync(id!);
               showSnackbar('Temporada eliminada exitosamente', 'success');
               router.back();
-            } catch (err) {
-              const message =
-                err instanceof Error ? err.message : 'Ocurrio un error inesperado.';
-              Alert.alert('Error', message);
+            } catch {
+              // El error se muestra globalmente via MutationCache.onError (snackbar sanitizado)
             }
           },
         },

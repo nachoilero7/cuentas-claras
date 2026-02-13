@@ -160,6 +160,15 @@ export async function executeOverdueRecurring(): Promise<{
     return { executed: 0, errors: ['Usuario no autenticado'] };
   }
 
+  // Obtener la temporada actual para asignarla a las transacciones creadas
+  const { data: currentSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('is_current', true)
+    .single();
+
+  const seasonId = currentSeason?.id ?? null;
+
   for (const rec of overdue as RecurringTransaction[]) {
     try {
       // Crear la transaccion correspondiente
@@ -177,7 +186,7 @@ export async function executeOverdueRecurring(): Promise<{
           transaction_date: rec.next_execution,
           created_by: user.id,
           status: 'pending',
-          season_id: null,
+          season_id: seasonId,
         })
         .select('id')
         .single();
