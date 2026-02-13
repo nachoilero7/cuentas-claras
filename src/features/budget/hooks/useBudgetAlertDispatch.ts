@@ -25,7 +25,7 @@ export function useBudgetAlertDispatch() {
           queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
         }
       } catch (err) {
-        console.warn('[BudgetAlertDispatch] Error:', err);
+        if (__DEV__) console.warn('[BudgetAlertDispatch] Error:', err);
       }
     }
 

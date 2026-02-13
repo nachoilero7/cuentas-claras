@@ -363,10 +363,12 @@ export default function MembersDirectoryScreen() {
       );
     }
 
+    const hasActiveFilters = search.trim() || roleFilter !== 'all';
+
     return (
       <View style={styles.emptyContainer}>
         <MaterialCommunityIcons
-          name="account-search-outline"
+          name={hasActiveFilters ? 'magnify-close' : 'account-search-outline'}
           size={64}
           color={colors.textTertiary}
         />
@@ -378,7 +380,11 @@ export default function MembersDirectoryScreen() {
             fontWeight: '600',
           }}
         >
-          No se encontraron miembros
+          {search.trim()
+            ? `Sin resultados para '${search.trim()}'`
+            : roleFilter !== 'all'
+              ? 'Sin resultados para tu busqueda'
+              : 'No se encontraron miembros'}
         </Text>
         <Text
           variant="bodyMedium"
@@ -388,7 +394,7 @@ export default function MembersDirectoryScreen() {
             textAlign: 'center',
           }}
         >
-          {search.trim() || roleFilter !== 'all'
+          {hasActiveFilters
             ? 'Intenta con otros filtros de busqueda.'
             : 'Aun no hay miembros registrados.'}
         </Text>

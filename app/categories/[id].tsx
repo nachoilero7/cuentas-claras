@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
@@ -23,6 +24,7 @@ import {
 } from '@/src/features/categories/hooks/useCategories';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
+import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { spacing } from '@/src/shared/theme';
 
 // ── Esquema de validacion con Zod ───────────────────────────────────────────
@@ -87,6 +89,33 @@ export default function CategoryFormScreen() {
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ── Navegacion y cambios sin guardar ────────────────────────────────────────
+  const navigation = useNavigation();
+  const hasUnsavedChanges = useRef(false);
+
+  // Marcar formulario como modificado cuando cambian los campos
+  useEffect(() => {
+    hasUnsavedChanges.current = true;
+  }, [name, description, icon, color, budgetArs, budgetUsd]);
+
+  // Advertir al usuario si navega con cambios sin guardar
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasUnsavedChanges.current) return;
+
+      e.preventDefault();
+      Alert.alert(
+        'Descartar cambios?',
+        'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        [
+          { text: 'Seguir editando', style: 'cancel' },
+          { text: 'Descartar', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Pre-rellenar en modo edicion
   useEffect(() => {
     if (!isCreateMode && category) {
@@ -104,6 +133,8 @@ export default function CategoryFormScreen() {
           ? String(category.budget_limit_usd)
           : ''
       );
+      // Prefill no cuenta como cambio del usuario
+      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, category]);
 
@@ -174,14 +205,14 @@ export default function CategoryFormScreen() {
     try {
       if (isCreateMode) {
         await createCategory.mutateAsync(payload);
-        Alert.alert('Rubro creado', 'El rubro se creo correctamente.', [
-          { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        hasUnsavedChanges.current = false;
+        showSnackbar('Rubro creado exitosamente', 'success');
+        router.back();
       } else {
         await updateCategory.mutateAsync({ id: id!, ...payload });
-        Alert.alert('Rubro actualizado', 'Los cambios se guardaron correctamente.', [
-          { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        hasUnsavedChanges.current = false;
+        showSnackbar('Rubro actualizado exitosamente', 'success');
+        router.back();
       }
     } catch (err) {
       const message =
@@ -216,9 +247,8 @@ export default function CategoryFormScreen() {
           onPress: async () => {
             try {
               await deleteCategory.mutateAsync(id!);
-              Alert.alert('Rubro eliminado', 'El rubro se elimino correctamente.', [
-                { text: 'Aceptar', onPress: () => router.back() },
-              ]);
+              showSnackbar('Rubro eliminado exitosamente', 'success');
+              router.back();
             } catch (err) {
               const message =
                 err instanceof Error ? err.message : 'Ocurrio un error inesperado.';

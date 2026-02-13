@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import {
 import { Text, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
@@ -31,6 +32,7 @@ import { useBiometric } from '@/src/features/security';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
 import { DatePickerInput } from '@/src/shared/components/ui/DatePickerInput';
+import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { spacing } from '@/src/shared/theme';
 import type {
   TransactionType,
@@ -155,6 +157,33 @@ export default function RecurringFormScreen() {
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ── Navegacion y cambios sin guardar ────────────────────────────────────────
+  const navigation = useNavigation();
+  const hasUnsavedChanges = useRef(false);
+
+  // Marcar formulario como modificado cuando cambian los campos
+  useEffect(() => {
+    hasUnsavedChanges.current = true;
+  }, [type, amount, currency, description, notes, categoryId, frequency, startDate, endDate, paymentMethod]);
+
+  // Advertir al usuario si navega con cambios sin guardar
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasUnsavedChanges.current) return;
+
+      e.preventDefault();
+      Alert.alert(
+        'Descartar cambios?',
+        'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        [
+          { text: 'Seguir editando', style: 'cancel' },
+          { text: 'Descartar', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Validacion inline por campo
   const validateField = useCallback(
     (field: string) => {
@@ -200,6 +229,8 @@ export default function RecurringFormScreen() {
       setFrequency(existingItem.frequency);
       setStartDate(new Date(existingItem.next_execution + 'T12:00:00'));
       setPaymentMethod(existingItem.payment_method ?? 'cash');
+      // Prefill no cuenta como cambio del usuario
+      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, existingItem]);
 
@@ -264,21 +295,17 @@ export default function RecurringFormScreen() {
     try {
       if (isCreateMode) {
         await createRecurring.mutateAsync(payload);
-        Alert.alert(
-          'Recurrente creada',
-          'La transaccion recurrente se creo correctamente.',
-          [{ text: 'Aceptar', onPress: () => router.back() }],
-        );
+        hasUnsavedChanges.current = false;
+        showSnackbar('Recurrente creada exitosamente', 'success');
+        router.back();
       } else {
         await updateRecurring.mutateAsync({
           id: id!,
           updates: payload,
         });
-        Alert.alert(
-          'Recurrente actualizada',
-          'Los cambios se guardaron correctamente.',
-          [{ text: 'Aceptar', onPress: () => router.back() }],
-        );
+        hasUnsavedChanges.current = false;
+        showSnackbar('Recurrente actualizada exitosamente', 'success');
+        router.back();
       }
     } catch (err) {
       const message =
@@ -319,11 +346,8 @@ export default function RecurringFormScreen() {
           onPress: async () => {
             try {
               await deleteRecurring.mutateAsync(id!);
-              Alert.alert(
-                'Recurrente eliminada',
-                'La transaccion recurrente se elimino correctamente.',
-                [{ text: 'Aceptar', onPress: () => router.back() }],
-              );
+              showSnackbar('Recurrente eliminada exitosamente', 'success');
+              router.back();
             } catch (err) {
               const message =
                 err instanceof Error ? err.message : 'Ocurrio un error inesperado.';

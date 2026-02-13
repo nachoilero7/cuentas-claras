@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,6 +13,7 @@ import {
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
@@ -29,6 +30,7 @@ import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
 import { DatePickerInput } from '@/src/shared/components/ui/DatePickerInput';
 import { dateToISO } from '@/src/core/utils/date';
+import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { spacing } from '@/src/shared/theme';
 import type { SeasonStatus } from '@/src/core/types/database';
 
@@ -84,6 +86,33 @@ export default function SeasonFormScreen() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ── Navegacion y cambios sin guardar ────────────────────────────────────────
+  const navigation = useNavigation();
+  const hasUnsavedChanges = useRef(false);
+
+  // Marcar formulario como modificado cuando cambian los campos
+  useEffect(() => {
+    hasUnsavedChanges.current = true;
+  }, [name, description, startDate, endDate, status, isCurrent]);
+
+  // Advertir al usuario si navega con cambios sin guardar
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasUnsavedChanges.current) return;
+
+      e.preventDefault();
+      Alert.alert(
+        'Descartar cambios?',
+        'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        [
+          { text: 'Seguir editando', style: 'cancel' },
+          { text: 'Descartar', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // ── Pre-rellenar en modo edicion ──────────────────────────────────────────
 
   useEffect(() => {
@@ -98,6 +127,8 @@ export default function SeasonFormScreen() {
       );
       setStatus(season.status ?? 'planning');
       setIsCurrent(season.is_current ?? false);
+      // Prefill no cuenta como cambio del usuario
+      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, season]);
 
@@ -153,9 +184,9 @@ export default function SeasonFormScreen() {
     try {
       if (isCreateMode) {
         await createSeason.mutateAsync(payload);
-        Alert.alert('Temporada creada', 'La temporada se creo correctamente.', [
-          { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        hasUnsavedChanges.current = false;
+        showSnackbar('Temporada creada exitosamente', 'success');
+        router.back();
       } else {
         await updateSeason.mutateAsync({ id: id!, updates: payload });
 
@@ -164,9 +195,9 @@ export default function SeasonFormScreen() {
           await setCurrentSeason.mutateAsync(id!);
         }
 
-        Alert.alert('Temporada actualizada', 'Los cambios se guardaron correctamente.', [
-          { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        hasUnsavedChanges.current = false;
+        showSnackbar('Temporada actualizada exitosamente', 'success');
+        router.back();
       }
     } catch (err) {
       const message =
@@ -203,9 +234,8 @@ export default function SeasonFormScreen() {
           onPress: async () => {
             try {
               await deleteSeason.mutateAsync(id!);
-              Alert.alert('Temporada eliminada', 'La temporada se elimino correctamente.', [
-                { text: 'Aceptar', onPress: () => router.back() },
-              ]);
+              showSnackbar('Temporada eliminada exitosamente', 'success');
+              router.back();
             } catch (err) {
               const message =
                 err instanceof Error ? err.message : 'Ocurrio un error inesperado.';

@@ -31,10 +31,10 @@ export function useRecurringExecution() {
         }
 
         if (errors.length > 0) {
-          console.warn('[RecurringExecution] Errores:', errors);
+          if (__DEV__) console.warn('[RecurringExecution] Errores:', errors);
         }
       } catch (err) {
-        console.warn('[RecurringExecution] Error general:', err);
+        if (__DEV__) console.warn('[RecurringExecution] Error general:', err);
       }
     }
 

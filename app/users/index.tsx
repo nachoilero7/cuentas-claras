@@ -284,8 +284,12 @@ export default function UsersListScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="account-group-outline"
-            title="Sin resultados"
+            icon={searchQuery.trim() ? 'magnify-close' : 'account-group-outline'}
+            title={
+              searchQuery.trim()
+                ? `Sin resultados para '${searchQuery.trim()}'`
+                : 'Sin usuarios'
+            }
             description={
               searchQuery.trim()
                 ? 'No se encontraron usuarios que coincidan con la busqueda.'

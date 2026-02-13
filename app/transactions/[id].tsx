@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import {
 import { Text, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
@@ -39,6 +40,7 @@ import {
   PAYMENT_METHOD_ICONS,
 } from '@/src/core/config/constants';
 import { useBiometric } from '@/src/features/security';
+import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { spacing } from '@/src/shared/theme';
 import type { TransactionType, CurrencyCode, PaymentMethod } from '@/src/core/types/database';
 
@@ -151,6 +153,33 @@ export default function TransactionFormScreen() {
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ── Navegacion y cambios sin guardar ────────────────────────────────────────
+  const navigation = useNavigation();
+  const hasUnsavedChanges = useRef(false);
+
+  // Marcar formulario como modificado cuando cambian los campos
+  useEffect(() => {
+    hasUnsavedChanges.current = true;
+  }, [type, amount, currency, exchangeRate, description, notes, categoryId, transferToCategoryId, transactionDate, paymentMethod, pendingImages]);
+
+  // Advertir al usuario si navega con cambios sin guardar
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasUnsavedChanges.current) return;
+
+      e.preventDefault();
+      Alert.alert(
+        'Descartar cambios?',
+        'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        [
+          { text: 'Seguir editando', style: 'cancel' },
+          { text: 'Descartar', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Validacion inline por campo
   const validateField = useCallback(
     (field: string) => {
@@ -199,6 +228,8 @@ export default function TransactionFormScreen() {
       setTransferToCategoryId(transaction.transfer_to_category_id ?? '');
       setTransactionDate(new Date(transaction.transaction_date + 'T12:00:00'));
       setPaymentMethod(transaction.payment_method ?? 'cash');
+      // Prefill no cuenta como cambio del usuario
+      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, transaction]);
 
@@ -329,21 +360,19 @@ export default function TransactionFormScreen() {
             { type: 'approval_pending', transactionId: result.id },
           );
 
-          Alert.alert(
-            'Movimiento enviado',
-            'Tu movimiento fue enviado para aprobacion. Te notificaremos cuando sea revisado por un administrador.',
-            [{ text: 'Aceptar', onPress: () => router.back() }],
-          );
+          hasUnsavedChanges.current = false;
+          showSnackbar('Movimiento enviado para aprobacion', 'success');
+          router.back();
         } else {
-          Alert.alert('Movimiento registrado', 'El movimiento se registro correctamente.', [
-            { text: 'Aceptar', onPress: () => router.back() },
-          ]);
+          hasUnsavedChanges.current = false;
+          showSnackbar('Movimiento registrado exitosamente', 'success');
+          router.back();
         }
       } else {
         await updateTransaction.mutateAsync({ id: id!, ...payload });
-        Alert.alert('Movimiento actualizado', 'Los cambios se guardaron correctamente.', [
-          { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        hasUnsavedChanges.current = false;
+        showSnackbar('Movimiento actualizado exitosamente', 'success');
+        router.back();
       }
     } catch (err) {
       const message =
@@ -389,9 +418,8 @@ export default function TransactionFormScreen() {
           onPress: async () => {
             try {
               await deleteTransaction.mutateAsync(id!);
-              Alert.alert('Movimiento eliminado', 'El movimiento se elimino correctamente.', [
-                { text: 'Aceptar', onPress: () => router.back() },
-              ]);
+              showSnackbar('Movimiento eliminado exitosamente', 'success');
+              router.back();
             } catch (err) {
               const message =
                 err instanceof Error ? err.message : 'Ocurrio un error inesperado.';

@@ -17,11 +17,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
 import {
   useDashboardSummary,
   useMonthlyBreakdown,
   useCategoryBreakdown,
 } from '@/src/features/dashboard/hooks/useDashboard';
+import { useRecurringTransactions } from '@/src/features/recurring/hooks/useRecurring';
+import { useBudgetStatus } from '@/src/features/budget/hooks/useBudgetAlerts';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
@@ -46,20 +49,26 @@ function getCurrentDateLabel(): string {
 interface SummaryCardProps {
   label: string;
   amount: number;
+  amountUsd?: number;
   color: string;
   iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   backgroundColor: string;
   textColor: string;
+  secondaryTextColor?: string;
 }
 
 function SummaryCard({
   label,
   amount,
+  amountUsd,
   color,
   iconName,
   backgroundColor,
   textColor,
+  secondaryTextColor,
 }: SummaryCardProps) {
+  const showUsd = amountUsd !== undefined && amountUsd !== 0;
+
   return (
     <View style={[styles.summaryCard, { backgroundColor }]}>
       <View style={[styles.summaryIconContainer, { backgroundColor: color + '18' }]}>
@@ -80,6 +89,16 @@ function SummaryCard({
       >
         {formatCurrency(amount ?? 0)}
       </Text>
+      {showUsd && (
+        <Text
+          variant="labelSmall"
+          style={[styles.summaryAmountUsd, { color: secondaryTextColor ?? textColor }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {formatCurrency(amountUsd, 'USD')}
+        </Text>
+      )}
     </View>
   );
 }
@@ -240,15 +259,24 @@ export default function DashboardScreen() {
   // Datos del perfil
   const { data: profile } = useProfile();
 
-  // Datos del dashboard
+  // Temporada actual
+  const { data: currentSeason } = useCurrentSeason();
+
+  // Datos del dashboard (filtrados por temporada actual)
   const {
     data: summary,
     isLoading: summaryLoading,
     error: summaryError,
-  } = useDashboardSummary();
+  } = useDashboardSummary(currentSeason?.id);
 
-  const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyBreakdown();
-  const { data: categoryData, isLoading: categoryLoading } = useCategoryBreakdown();
+  const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyBreakdown(currentSeason?.id);
+  const { data: categoryData, isLoading: categoryLoading } = useCategoryBreakdown({
+    seasonId: currentSeason?.id,
+  });
+
+  // Datos de recurrentes y presupuestos para indicadores
+  const { data: recurringData } = useRecurringTransactions();
+  const { data: budgetStatuses } = useBudgetStatus();
 
   // Nombre para mostrar
   const displayName =
@@ -268,7 +296,12 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      queryClient.invalidateQueries({ queryKey: ['current-season'] }),
+      queryClient.invalidateQueries({ queryKey: ['recurring-transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['budget-status'] }),
+    ]);
     setRefreshing(false);
   }, [queryClient]);
 
@@ -285,6 +318,21 @@ export default function DashboardScreen() {
     if (!categoryData || categoryData.length === 0) return 0;
     return categoryData.reduce((sum, cat) => sum + cat.total_ars, 0);
   }, [categoryData]);
+
+  // Recurrentes vencidas (next_execution <= hoy y activas)
+  const overdueRecurringCount = useMemo(() => {
+    if (!recurringData || recurringData.length === 0) return 0;
+    const today = new Date().toISOString().split('T')[0];
+    return recurringData.filter(
+      (r) => r.is_active && r.next_execution <= today
+    ).length;
+  }, [recurringData]);
+
+  // Alertas de presupuesto sobre el umbral
+  const overBudgetCount = useMemo(() => {
+    if (!budgetStatuses || budgetStatuses.length === 0) return 0;
+    return budgetStatuses.filter((s) => s.is_over_threshold).length;
+  }, [budgetStatuses]);
 
   // Balance colores
   const balanceColor =
@@ -337,6 +385,12 @@ export default function DashboardScreen() {
             >
               {currentDate}
             </Text>
+            <Text
+              variant="bodySmall"
+              style={{ color: colors.textSecondary, marginTop: spacing.xxs }}
+            >
+              Temporada: {currentSeason?.name ?? 'Sin temporada activa'}
+            </Text>
           </View>
           <View
             style={[
@@ -380,26 +434,32 @@ export default function DashboardScreen() {
             <SummaryCard
               label="Ingresos"
               amount={summary?.total_income_ars ?? 0}
+              amountUsd={summary?.total_income_usd ?? 0}
               color={colors.income}
               iconName="trending-up"
               backgroundColor={colors.surface}
               textColor={colors.textSecondary}
+              secondaryTextColor={colors.textTertiary}
             />
             <SummaryCard
               label="Egresos"
               amount={summary?.total_expenses_ars ?? 0}
+              amountUsd={summary?.total_expenses_usd ?? 0}
               color={colors.expense}
               iconName="trending-down"
               backgroundColor={colors.surface}
               textColor={colors.textSecondary}
+              secondaryTextColor={colors.textTertiary}
             />
             <SummaryCard
               label="Balance"
               amount={summary?.net_balance_ars ?? 0}
+              amountUsd={summary?.net_balance_usd ?? 0}
               color={balanceColor}
               iconName="scale-balance"
               backgroundColor={colors.surface}
               textColor={colors.textSecondary}
+              secondaryTextColor={colors.textTertiary}
             />
           </View>
 
@@ -435,6 +495,80 @@ export default function DashboardScreen() {
                 </Text>
               </Pressable>
             )}
+          </View>
+
+          {/* ── Fila de indicadores: recurrentes y presupuestos ─────── */}
+          <View style={styles.countersRow}>
+            <Pressable
+              style={[
+                styles.counterChip,
+                {
+                  backgroundColor: colors.surface,
+                  borderWidth: overdueRecurringCount > 0 ? 1 : 0,
+                  borderColor: overdueRecurringCount > 0 ? colors.warning : 'transparent',
+                },
+              ]}
+              onPress={() => router.push('/recurring')}
+              accessibilityRole="button"
+              accessibilityLabel={
+                overdueRecurringCount > 0
+                  ? `${overdueRecurringCount} recurrentes vencidas`
+                  : 'Ver recurrentes'
+              }
+            >
+              <MaterialCommunityIcons
+                name="autorenew"
+                size={18}
+                color={overdueRecurringCount > 0 ? colors.warning : colors.primary}
+              />
+              <Text
+                variant="labelMedium"
+                style={{
+                  color: overdueRecurringCount > 0 ? colors.warning : colors.text,
+                  marginLeft: spacing.xs,
+                  fontWeight: overdueRecurringCount > 0 ? '600' : '400',
+                }}
+              >
+                {overdueRecurringCount > 0
+                  ? `${overdueRecurringCount} vencidas`
+                  : 'Recurrentes'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.counterChip,
+                {
+                  backgroundColor: colors.surface,
+                  borderWidth: overBudgetCount > 0 ? 1 : 0,
+                  borderColor: overBudgetCount > 0 ? colors.error : 'transparent',
+                },
+              ]}
+              onPress={() => router.push('/budget-alerts')}
+              accessibilityRole="button"
+              accessibilityLabel={
+                overBudgetCount > 0
+                  ? `${overBudgetCount} alertas de presupuesto activas`
+                  : 'Ver presupuestos'
+              }
+            >
+              <MaterialCommunityIcons
+                name="alert-circle-outline"
+                size={18}
+                color={overBudgetCount > 0 ? colors.error : colors.primary}
+              />
+              <Text
+                variant="labelMedium"
+                style={{
+                  color: overBudgetCount > 0 ? colors.error : colors.text,
+                  marginLeft: spacing.xs,
+                  fontWeight: overBudgetCount > 0 ? '600' : '400',
+                }}
+              >
+                {overBudgetCount > 0
+                  ? `${overBudgetCount} sobre limite`
+                  : 'Presupuestos'}
+              </Text>
+            </Pressable>
           </View>
 
           {/* ── Grafico mensual: Ingresos vs Egresos ─────────────────── */}
@@ -715,6 +849,11 @@ const styles = StyleSheet.create({
   },
   summaryAmount: {
     fontWeight: '700',
+  },
+  summaryAmountUsd: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: spacing.xxs,
   },
 
   // Contadores secundarios

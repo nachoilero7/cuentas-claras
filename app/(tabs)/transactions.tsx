@@ -247,12 +247,22 @@ export default function TransactionsScreen() {
         </View>
 
         <EmptyState
-          icon="receipt-text-outline"
-          title="Sin movimientos"
+          icon={
+            debouncedSearch || activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId
+              ? 'magnify-close'
+              : 'receipt-text-outline'
+          }
+          title={
+            debouncedSearch || activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId
+              ? 'Sin resultados para tu busqueda'
+              : 'Sin movimientos'
+          }
           description={
-            activeFilter === 'all'
-              ? 'Registra tu primer movimiento para empezar a llevar el control de tus finanzas.'
-              : `No hay ${FILTER_CHIPS.find((f) => f.key === activeFilter)?.label?.toLowerCase() ?? 'movimientos'} registrados.`
+            debouncedSearch
+              ? `No se encontraron movimientos para "${debouncedSearch}".`
+              : activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId
+                ? 'No hay movimientos que coincidan con los filtros aplicados.'
+                : 'Registra tu primer movimiento para empezar a llevar el control de tus finanzas.'
           }
           actionLabel={canCreate ? 'Nuevo movimiento' : undefined}
           onAction={canCreate ? handleNavigateToNew : undefined}

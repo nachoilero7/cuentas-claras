@@ -6,6 +6,9 @@ export interface DashboardSummary {
   total_income_ars: number;
   total_expenses_ars: number;
   net_balance_ars: number;
+  total_income_usd: number;
+  total_expenses_usd: number;
+  net_balance_usd: number;
   transaction_count: number;
   pending_approvals: number;
 }
