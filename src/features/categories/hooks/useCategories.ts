@@ -9,6 +9,7 @@ import {
 import type { Category } from '@/src/core/types/database';
 import type { UpdateCategoryData } from '../services/categoryService';
 import { useOfflineAware } from '@/src/sync';
+import { invalidateFinancialData } from '@/src/core/utils/queryInvalidation';
 
 const TWO_MINUTES = 1000 * 60 * 2;
 
@@ -138,6 +139,9 @@ export function useUpdateCategory() {
       // Invalidar la lista y el detalle de la categoria actualizada
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       queryClient.invalidateQueries({ queryKey: ['category', variables.id] });
+      // Cambios en presupuesto/nombre afectan datos financieros
+      invalidateFinancialData(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
     },
   });
 }
@@ -191,9 +195,9 @@ export function useDeleteCategory() {
     onSuccess: () => {
       // Invalidar las listas de categorias para reflejar la eliminacion
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      // Invalidar transacciones y dashboard ya que referencian categorias
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      // Invalidar todos los datos financieros que referencian categorias
+      invalidateFinancialData(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
     },
   });
 }

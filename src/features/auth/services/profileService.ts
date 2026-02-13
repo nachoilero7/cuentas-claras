@@ -103,6 +103,8 @@ export async function uploadAvatar(
     .eq('id', userId);
 
   if (updateError) {
+    // Limpiar archivo huerfano del storage si el update del perfil fallo
+    await supabase.storage.from('avatars').remove([filePath]);
     return { url: null, error: updateError };
   }
 

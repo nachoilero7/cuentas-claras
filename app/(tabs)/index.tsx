@@ -299,7 +299,7 @@ export default function DashboardScreen() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       queryClient.invalidateQueries({ queryKey: ['current-season'] }),
-      queryClient.invalidateQueries({ queryKey: ['recurring-transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['recurring'] }),
       queryClient.invalidateQueries({ queryKey: ['budget-status'] }),
     ]);
     setRefreshing(false);
@@ -316,7 +316,7 @@ export default function DashboardScreen() {
   // Calcular totales y porcentajes de categorias
   const categoryTotal = useMemo(() => {
     if (!categoryData || categoryData.length === 0) return 0;
-    return categoryData.reduce((sum, cat) => sum + cat.total_ars, 0);
+    return categoryData.reduce((sum, cat) => sum + (cat.total_ars ?? 0), 0);
   }, [categoryData]);
 
   // Recurrentes vencidas (next_execution <= hoy y activas)
@@ -683,7 +683,7 @@ export default function DashboardScreen() {
                     key={cat.category_id}
                     name={cat.category_name}
                     amount={cat.total_ars}
-                    percentage={categoryTotal > 0 ? (cat.total_ars / categoryTotal) * 100 : 0}
+                    percentage={categoryTotal > 0 ? ((cat.total_ars ?? 0) / categoryTotal) * 100 : 0}
                     color={cat.color ?? colors.expense}
                     icon={cat.icon}
                     surfaceColor={colors.surfaceVariant}

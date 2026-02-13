@@ -9,6 +9,7 @@ import {
 import type { ApprovalWithDetails } from '../services/approvalService';
 import { sendPushToUser } from '@/src/core/services/pushNotifications';
 import { useOfflineAware } from '@/src/sync';
+import { invalidateFinancialData } from '@/src/core/utils/queryInvalidation';
 
 const ONE_MINUTE = 1000 * 60;
 
@@ -61,10 +62,9 @@ export function useApproveRequest() {
       return result;
     },
     onSuccess: (data) => {
-      // Invalidar aprobaciones, transacciones y dashboard para refrescar datos
+      // Invalidar aprobaciones y todos los datos financieros
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateFinancialData(queryClient);
 
       // Notificar al creador de la transaccion que fue aprobada
       if (data?.requested_by && data?.transaction) {
@@ -101,10 +101,9 @@ export function useRejectRequest() {
       return result;
     },
     onSuccess: (data) => {
-      // Invalidar aprobaciones, transacciones y dashboard para refrescar datos
+      // Invalidar aprobaciones y todos los datos financieros
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateFinancialData(queryClient);
 
       // Notificar al creador de la transaccion que fue rechazada
       if (data?.requested_by && data?.transaction) {

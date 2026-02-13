@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { executeOverdueRecurring } from '../services/recurringService';
 import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { queryClient } from '@/src/core/config/queryClient';
+import { invalidateFinancialData } from '@/src/core/utils/queryInvalidation';
 
 /**
  * Hook que ejecuta transacciones recurrentes vencidas al abrir la app.
@@ -21,8 +22,7 @@ export function useRecurringExecution() {
         const { executed, errors } = await executeOverdueRecurring();
 
         if (executed > 0) {
-          queryClient.invalidateQueries({ queryKey: ['transactions'] });
-          queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+          invalidateFinancialData(queryClient);
           queryClient.invalidateQueries({ queryKey: ['recurring'] });
 
           showSnackbar(

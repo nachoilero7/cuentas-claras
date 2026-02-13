@@ -13,6 +13,7 @@ import type {
   CreateTransactionData,
 } from '../services/transactionService';
 import { useOfflineAware } from '@/src/sync';
+import { invalidateFinancialData } from '@/src/core/utils/queryInvalidation';
 import type { TransactionStatus } from '@/src/core/types/database';
 
 type OfflineMutationPayload = Record<string, string | number | boolean | null | undefined>;
@@ -71,9 +72,8 @@ export function useCreateTransaction() {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      invalidateFinancialData(queryClient);
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -100,8 +100,9 @@ export function useUpdateTransaction() {
       return result;
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      invalidateFinancialData(queryClient);
       queryClient.invalidateQueries({ queryKey: ['transaction', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
     },
   });
 }
@@ -153,7 +154,7 @@ export function useDeleteTransaction() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      invalidateFinancialData(queryClient);
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
     },
   });

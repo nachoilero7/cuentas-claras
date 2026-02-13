@@ -10,6 +10,7 @@ import {
 } from '../services/seasonService';
 import type { Season } from '@/src/core/types/database';
 import type { CreateSeasonData, UpdateSeasonData } from '../services/seasonService';
+import { invalidateFinancialData } from '@/src/core/utils/queryInvalidation';
 
 const TEN_MINUTES = 1000 * 60 * 10;
 
@@ -127,8 +128,15 @@ export function useDeleteSeason() {
       return data;
     },
     onSuccess: () => {
-      // Invalidar la lista de temporadas para reflejar la eliminacion
+      // Invalidar la lista de temporadas y la temporada actual
       queryClient.invalidateQueries({ queryKey: ['seasons'] });
+      queryClient.invalidateQueries({ queryKey: ['current-season'] });
+      // Invalidar todos los datos que dependen de la temporada eliminada
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      invalidateFinancialData(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['recurring'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
     },
   });
 }

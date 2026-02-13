@@ -33,6 +33,7 @@ export function useUpsertBudgetAlert() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-status'] });
     },
   });
 }
@@ -50,6 +51,7 @@ export function useDeleteBudgetAlert() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-status'] });
     },
   });
 }

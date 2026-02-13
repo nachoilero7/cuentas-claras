@@ -339,14 +339,20 @@ export default function TransactionFormScreen() {
 
         // Subir comprobantes pendientes si los hay
         if (result && pendingImages.length > 0) {
+          let failedCount = 0;
           for (const img of pendingImages) {
             try {
               await uploadAttachment(result.id, img.uri, img.fileName, img.mimeType);
             } catch {
-              // Silenciar errores individuales de adjuntos (la transaccion ya se creo)
+              failedCount++;
             }
           }
           setPendingImages([]);
+          if (failedCount > 0) {
+            showSnackbar(
+              `${failedCount} comprobante${failedCount > 1 ? 's' : ''} no se pudo${failedCount > 1 ? 'ieron' : ''} subir. Podes adjuntarlos luego.`,
+            );
+          }
         }
 
         if (!isAdmin && result) {
