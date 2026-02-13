@@ -548,6 +548,35 @@ export default function SettingsScreen() {
         </View>
       )}
 
+      {/* ── Auditoria (admin y manager) ──────────────────────────── */}
+      {(role === 'admin' || role === 'manager') && (
+        <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+          <Pressable
+            style={styles.infoRow}
+            onPress={() => router.push('/audit')}
+          >
+            <MaterialCommunityIcons
+              name="text-box-search-outline"
+              size={20}
+              color={colors.primary}
+            />
+            <View style={styles.infoContent}>
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                Registro de auditoria
+              </Text>
+              <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                Historial de acciones del sistema
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={colors.textTertiary}
+            />
+          </Pressable>
+        </View>
+      )}
+
       {/* ── Herramientas (todos los usuarios) ──────────────────────── */}
       <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
         <Pressable

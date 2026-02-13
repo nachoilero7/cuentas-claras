@@ -11,6 +11,7 @@ import { initSentry } from '@/src/core/config/sentry';
 import { QueryProvider } from '@/src/core/providers/QueryProvider';
 import { ThemeProvider } from '@/src/core/providers/ThemeProvider';
 import { AuthProvider } from '@/src/core/providers/AuthProvider';
+import { RealtimeProvider } from '@/src/core/providers/RealtimeProvider';
 import { OfflineBanner } from '@/src/shared/components/feedback/OfflineBanner';
 import { OfflineQueueIndicator } from '@/src/shared/components/feedback/OfflineQueueIndicator';
 import { SnackbarHost } from '@/src/shared/components/feedback/SnackbarHost';
@@ -82,6 +83,7 @@ export default function RootLayout() {
     <QueryProvider>
       <ThemeProvider>
         <AuthProvider>
+          <RealtimeProvider>
           <AppErrorBoundary>
             <View style={styles.root}>
               <StatusBar style="auto" />
@@ -91,6 +93,7 @@ export default function RootLayout() {
               <SnackbarHost />
             </View>
           </AppErrorBoundary>
+          </RealtimeProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryProvider>

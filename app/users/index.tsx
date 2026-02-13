@@ -6,8 +6,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  Share,
 } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
@@ -56,6 +57,19 @@ export default function UsersListScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const role = profile?.role ?? 'viewer';
+
+  const handleInviteMember = useCallback(async () => {
+    try {
+      await Share.share({
+        title: 'Unete a Cuentas Claras',
+        message:
+          '¡Te invito a unirte a Cuentas Claras, la app de finanzas de la sub-comision! ' +
+          'Descarga la app y registrate para comenzar.',
+      });
+    } catch {
+      // El usuario cancelo el share, no se requiere accion
+    }
+  }, []);
 
   // ── Filtrado de usuarios por busqueda ────────────────────────────────────
 
@@ -299,6 +313,16 @@ export default function UsersListScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {/* FAB para invitar miembros */}
+      <FAB
+        icon="account-plus"
+        label="Invitar"
+        onPress={handleInviteMember}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        color={colors.onPrimary}
+        accessibilityLabel="Invitar nuevo miembro"
+      />
     </View>
   );
 }
@@ -394,5 +418,11 @@ const styles = StyleSheet.create({
   roleBadgeText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.md,
+    borderRadius: 16,
   },
 });
