@@ -223,6 +223,15 @@ export default function SeasonFormScreen() {
   // ── Eliminar temporada ────────────────────────────────────────────────────
 
   const handleDelete = useCallback(() => {
+    // No permitir borrar la temporada actual
+    if (season?.is_current) {
+      Alert.alert(
+        'No se puede eliminar',
+        'Esta temporada esta marcada como actual. Primero marca otra temporada como actual antes de eliminarla.',
+      );
+      return;
+    }
+
     Alert.alert(
       'Eliminar temporada',
       'Estas seguro que deseas eliminar esta temporada? Esta accion no se puede deshacer.',
@@ -245,7 +254,7 @@ export default function SeasonFormScreen() {
         },
       ]
     );
-  }, [id, deleteSeason]);
+  }, [id, deleteSeason, season]);
 
   // ── Determinar si el formulario esta procesando ───────────────────────────
 

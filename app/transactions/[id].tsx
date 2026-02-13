@@ -735,6 +735,14 @@ export default function TransactionFormScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.categoryChipsContainer}
               >
+                {activeCategories.length === 0 && (
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: colors.textTertiary, paddingVertical: spacing.sm }}
+                  >
+                    No hay rubros activos. Pedi a un admin que cree uno.
+                  </Text>
+                )}
                 {activeCategories.map((cat) => {
                   const isSelected = categoryId === cat.id;
                   const catColor = cat.color ?? colors.primary;

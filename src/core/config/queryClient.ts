@@ -11,9 +11,11 @@ export const queryClient = new QueryClient({
       gcTime: TEN_MINUTES,
       retry: 2,
       refetchOnWindowFocus: false,
+      networkMode: 'online',
     },
     mutations: {
       retry: 1,
+      networkMode: 'always',
     },
   },
   mutationCache: new MutationCache({

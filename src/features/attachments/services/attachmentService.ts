@@ -8,6 +8,16 @@ import type { Attachment } from '@/src/core/types/database';
 // ─── Tamaño maximo permitido para adjuntos (10 MB) ─────────────────────────
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+// ─── MIME types permitidos ──────────────────────────────────────────────────
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+]);
+
 // ─── Obtener adjuntos de una transaccion ─────────────────────────────────────
 
 export async function getAttachmentsByTransaction(transactionId: string) {
@@ -36,6 +46,11 @@ export async function uploadAttachment(
 
   if (authError || !user) {
     return { data: null, error: authError ?? new Error('Usuario no autenticado') };
+  }
+
+  // Verificar MIME type permitido
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    return { data: null, error: new Error('Tipo de archivo no permitido. Solo se aceptan imagenes (JPEG, PNG, WebP, HEIC) y PDF.') };
   }
 
   // Verificar tamaño del archivo antes de leerlo en memoria
