@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -89,7 +89,7 @@ export default function RootLayout() {
               <StatusBar style="auto" />
               <OfflineBanner />
               <OfflineQueueIndicator />
-              <Slot />
+              <Stack screenOptions={{ headerShown: false }} />
               <SnackbarHost />
             </View>
           </AppErrorBoundary>
