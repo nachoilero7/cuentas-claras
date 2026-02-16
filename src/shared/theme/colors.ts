@@ -1,37 +1,37 @@
 /**
  * Paleta de colores para Cuentas Claras
  *
- * Sistema de colores profesional para una aplicacion financiera.
- * Basado en tonos azul profundo con acentos en teal/esmeralda.
+ * Identidad rojinegra de Club Independiente.
+ * Rojo vibrante como primario, negro/grafito como secundario.
  */
 
-// ── Paleta primaria: azul profundo ──────────────────────────────────────────
+// ── Paleta primaria: rojo Independiente ─────────────────────────────────────
 export const primary = {
-  50: '#e8eaf6',
-  100: '#c5cae9',
-  200: '#9fa8da',
-  300: '#7986cb',
-  400: '#5c6bc0',
-  500: '#0f3460',
-  600: '#16213e',
-  700: '#1a1a2e',
-  800: '#131029',
-  900: '#0d0a1f',
-  accent: '#533483',
+  50: '#fef2f2',
+  100: '#fee2e2',
+  200: '#fecaca',
+  300: '#fca5a5',
+  400: '#f87171',
+  500: '#C41E3A',
+  600: '#b91c35',
+  700: '#9f1a2f',
+  800: '#7f1528',
+  900: '#5c0f1d',
+  accent: '#e11d48',
 } as const;
 
-// ── Paleta secundaria: teal/esmeralda ───────────────────────────────────────
+// ── Paleta secundaria: negro/grafito ────────────────────────────────────────
 export const secondary = {
-  50: '#ecfdf5',
-  100: '#d1fae5',
-  200: '#a7f3d0',
-  300: '#6ee7b7',
-  400: '#34d399',
-  500: '#10b981',
-  600: '#059669',
-  700: '#047857',
-  800: '#065f46',
-  900: '#064e3b',
+  50: '#f5f5f5',
+  100: '#e5e5e5',
+  200: '#d4d4d4',
+  300: '#a3a3a3',
+  400: '#737373',
+  500: '#1a1a1a',
+  600: '#141414',
+  700: '#0f0f0f',
+  800: '#0a0a0a',
+  900: '#050505',
 } as const;
 
 // ── Grises neutros ──────────────────────────────────────────────────────────
@@ -85,20 +85,20 @@ export const semantic = {
 // ── Esquema de colores claro ────────────────────────────────────────────────
 export const lightColorScheme = {
   // Superficies
-  background: '#f8f9fc',
+  background: '#faf8f8',
   surface: '#ffffff',
-  surfaceVariant: '#f1f3f8',
+  surfaceVariant: '#f5f0f0',
   surfaceDisabled: '#e5e5e5',
 
-  // Primarios
+  // Primarios (rojo Independiente)
   primary: primary[500],
-  primaryContainer: '#e8eaf6',
+  primaryContainer: '#fef2f2',
   onPrimary: '#ffffff',
   onPrimaryContainer: primary[700],
 
-  // Secundarios
+  // Secundarios (negro/grafito)
   secondary: secondary[500],
-  secondaryContainer: '#d1fae5',
+  secondaryContainer: '#f5f5f5',
   onSecondary: '#ffffff',
   onSecondaryContainer: secondary[800],
 
@@ -148,36 +148,36 @@ export const lightColorScheme = {
 // ── Esquema de colores oscuro ───────────────────────────────────────────────
 export const darkColorScheme = {
   // Superficies
-  background: '#0d1117',
-  surface: '#161b22',
-  surfaceVariant: '#1c2333',
+  background: '#0d0d0d',
+  surface: '#1a1a1a',
+  surfaceVariant: '#252525',
   surfaceDisabled: '#2a2a2a',
 
-  // Primarios
-  primary: '#5c9aff',
-  primaryContainer: '#1a3050',
-  onPrimary: '#0d1117',
-  onPrimaryContainer: '#b8d4ff',
+  // Primarios (rojo Independiente – tonos claros para contraste en dark)
+  primary: '#f87171',
+  primaryContainer: '#3b1018',
+  onPrimary: '#1a0508',
+  onPrimaryContainer: '#fecaca',
 
-  // Secundarios
-  secondary: '#34d399',
-  secondaryContainer: '#064e3b',
-  onSecondary: '#0d1117',
-  onSecondaryContainer: '#a7f3d0',
+  // Secundarios (grafito claro)
+  secondary: '#d4d4d4',
+  secondaryContainer: '#333333',
+  onSecondary: '#0d0d0d',
+  onSecondaryContainer: '#e5e5e5',
 
   // Acento
-  accent: '#a78bfa',
-  onAccent: '#0d1117',
+  accent: '#fb7185',
+  onAccent: '#1a0508',
 
   // Texto
-  text: '#e6edf3',
-  textSecondary: '#8b949e',
-  textTertiary: '#6e7681',
-  textDisabled: '#484f58',
+  text: '#e5e5e5',
+  textSecondary: '#a3a3a3',
+  textTertiary: '#737373',
+  textDisabled: '#525252',
 
   // Bordes
-  outline: '#30363d',
-  outlineVariant: '#21262d',
+  outline: '#333333',
+  outlineVariant: '#252525',
 
   // Semanticos
   success: '#3fb950',
@@ -193,7 +193,7 @@ export const darkColorScheme = {
   income: '#3fb950',
   expense: '#f85149',
   transfer: '#58a6ff',
-  balance: '#5c9aff',
+  balance: '#f87171',
 
   // Elevacion / sombras
   shadow: 'rgba(0, 0, 0, 0.3)',

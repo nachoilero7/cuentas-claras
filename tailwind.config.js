@@ -9,46 +9,46 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primarios - azul profundo
+        // Primarios - rojo Independiente
         primary: {
-          50: '#e8eaf6',
-          100: '#c5cae9',
-          200: '#9fa8da',
-          300: '#7986cb',
-          400: '#5c6bc0',
-          500: '#0f3460',
-          600: '#16213e',
-          700: '#1a1a2e',
-          800: '#131029',
-          900: '#0d0a1f',
-          DEFAULT: '#0f3460',
-          accent: '#533483',
+          50: '#fef2f2',
+          100: '#fee2e2',
+          200: '#fecaca',
+          300: '#fca5a5',
+          400: '#f87171',
+          500: '#C41E3A',
+          600: '#b91c35',
+          700: '#9f1a2f',
+          800: '#7f1528',
+          900: '#5c0f1d',
+          DEFAULT: '#C41E3A',
+          accent: '#e11d48',
         },
-        // Secundarios - teal/esmeralda
+        // Secundarios - negro/grafito
         secondary: {
-          50: '#ecfdf5',
-          100: '#d1fae5',
-          200: '#a7f3d0',
-          300: '#6ee7b7',
-          400: '#34d399',
-          500: '#10b981',
-          600: '#059669',
-          700: '#047857',
-          800: '#065f46',
-          900: '#064e3b',
-          DEFAULT: '#10b981',
+          50: '#f5f5f5',
+          100: '#e5e5e5',
+          200: '#d4d4d4',
+          300: '#a3a3a3',
+          400: '#737373',
+          500: '#1a1a1a',
+          600: '#141414',
+          700: '#0f0f0f',
+          800: '#0a0a0a',
+          900: '#050505',
+          DEFAULT: '#1a1a1a',
         },
         // Superficies
         surface: {
           light: '#ffffff',
-          'light-variant': '#f1f3f8',
-          dark: '#161b22',
-          'dark-variant': '#1c2333',
+          'light-variant': '#f5f0f0',
+          dark: '#1a1a1a',
+          'dark-variant': '#252525',
         },
         // Fondo
         bg: {
-          light: '#f8f9fc',
-          dark: '#0d1117',
+          light: '#faf8f8',
+          dark: '#0d0d0d',
         },
         // Semanticos
         success: {

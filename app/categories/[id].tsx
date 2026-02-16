@@ -26,6 +26,7 @@ import {
 } from '@/src/features/categories/hooks/useCategories';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
+import { IconPicker } from '@/src/shared/components/ui/IconPicker';
 import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { spacing } from '@/src/shared/theme';
 
@@ -371,16 +372,11 @@ export default function CategoryFormScreen() {
             />
 
             {/* Icono */}
-            <Input
+            <IconPicker
               label="Icono"
               value={icon}
-              onChangeText={setIcon}
-              placeholder="Ej: food-fork-drink"
-              leftIcon="shape-outline"
+              onSelect={setIcon}
               error={errors.icon}
-              helperText="Nombre del icono de Material Design"
-              maxLength={50}
-              autoCapitalize="none"
             />
 
             {/* Color */}

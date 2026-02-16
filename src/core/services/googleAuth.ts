@@ -7,7 +7,9 @@ WebBrowser.maybeCompleteAuthSession();
 
 // ─── Redirect URI para el flujo OAuth ──────────────────────────────────────
 
-const redirectUri = makeRedirectUri();
+const redirectUri = makeRedirectUri({
+  scheme: 'cuentasclaras',
+});
 
 // ─── Iniciar sesion con Google via Supabase OAuth ──────────────────────────
 
