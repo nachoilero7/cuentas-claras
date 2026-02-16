@@ -138,6 +138,112 @@ export default function BudgetAlertsScreen() {
     return (alerts ?? []).filter((a) => a.is_active);
   }, [alerts]);
 
+  // Cabecera de la lista (debe estar antes de los early returns - Rules of Hooks)
+  const ListHeaderComponent = useMemo(() => {
+    if (activeAlerts.length === 0) return null;
+
+    return (
+      <View>
+        {/* Seccion de estados de presupuesto */}
+        <View style={styles.sectionHeader}>
+          <MaterialCommunityIcons
+            name="chart-bar"
+            size={20}
+            color={colors.primary}
+          />
+          <Text
+            variant="titleMedium"
+            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
+          >
+            Estado de presupuestos
+          </Text>
+        </View>
+
+        {activeAlerts.map((alert) => {
+          const status = statusMap.get(alert.category_id);
+          if (!status) return null;
+
+          const progressColor = getProgressColor(status.percentage_used, status.threshold_percentage, colors);
+          const iconName = (alert.category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'tag-outline';
+
+          return (
+            <Card
+              key={`status-${alert.id}`}
+              variant="elevated"
+              padding="md"
+              style={styles.statusCard}
+            >
+              <View style={styles.statusHeader}>
+                <View style={[styles.statusIconContainer, { backgroundColor: alert.category?.color ? `${alert.category.color}20` : colors.primaryContainer }]}>
+                  <MaterialCommunityIcons
+                    name={iconName}
+                    size={20}
+                    color={alert.category?.color ?? colors.primary}
+                  />
+                </View>
+                <View style={styles.statusHeaderText}>
+                  <Text
+                    variant="titleSmall"
+                    style={{ color: colors.text, fontWeight: '700' }}
+                    numberOfLines={1}
+                  >
+                    {status.category_name}
+                  </Text>
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: progressColor, fontWeight: '600' }}
+                  >
+                    {Math.round(status.percentage_used)}% usado
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: spacing.sm }}>
+                <ProgressBar
+                  percentage={status.percentage_used}
+                  threshold={status.threshold_percentage}
+                  color={progressColor}
+                  trackColor={colors.outlineVariant}
+                  markerColor={colors.text}
+                />
+              </View>
+
+              <View style={styles.statusFooter}>
+                <Text
+                  variant="bodySmall"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {formatCurrency(status.current_spending)} / {formatCurrency(status.budget_limit)}
+                </Text>
+                <Text
+                  variant="labelSmall"
+                  style={{ color: colors.textTertiary }}
+                >
+                  Umbral: {status.threshold_percentage}%
+                </Text>
+              </View>
+            </Card>
+          );
+        })}
+
+        {/* Separador */}
+        <View style={styles.sectionHeader}>
+          <MaterialCommunityIcons
+            name="cog-outline"
+            size={20}
+            color={colors.primary}
+          />
+          <Text
+            variant="titleMedium"
+            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
+          >
+            Configuracion de alertas
+          </Text>
+        </View>
+      </View>
+    );
+  }, [activeAlerts, statusMap, colors]);
+
   // ── Guard: solo admin puede acceder ──────────────────────────────────────
 
   if (!isProfileLoading && !isAdmin) {
@@ -266,75 +372,6 @@ export default function BudgetAlertsScreen() {
     refetchStatus();
   };
 
-  // ── Renderizar tarjeta de estado de presupuesto ────────────────────────────
-
-  const renderStatusCard = (alert: BudgetAlertWithCategory) => {
-    const status = statusMap.get(alert.category_id);
-    if (!status) return null;
-
-    const progressColor = getProgressColor(status.percentage_used, status.threshold_percentage, colors);
-    const iconName = (alert.category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'tag-outline';
-
-    return (
-      <Card
-        key={`status-${alert.id}`}
-        variant="elevated"
-        padding="md"
-        style={styles.statusCard}
-      >
-        <View style={styles.statusHeader}>
-          <View style={[styles.statusIconContainer, { backgroundColor: alert.category?.color ? `${alert.category.color}20` : colors.primaryContainer }]}>
-            <MaterialCommunityIcons
-              name={iconName}
-              size={20}
-              color={alert.category?.color ?? colors.primary}
-            />
-          </View>
-          <View style={styles.statusHeaderText}>
-            <Text
-              variant="titleSmall"
-              style={{ color: colors.text, fontWeight: '700' }}
-              numberOfLines={1}
-            >
-              {status.category_name}
-            </Text>
-            <Text
-              variant="labelSmall"
-              style={{ color: progressColor, fontWeight: '600' }}
-            >
-              {Math.round(status.percentage_used)}% usado
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ marginTop: spacing.sm }}>
-          <ProgressBar
-            percentage={status.percentage_used}
-            threshold={status.threshold_percentage}
-            color={progressColor}
-            trackColor={colors.outlineVariant}
-            markerColor={colors.text}
-          />
-        </View>
-
-        <View style={styles.statusFooter}>
-          <Text
-            variant="bodySmall"
-            style={{ color: colors.textSecondary }}
-          >
-            {formatCurrency(status.current_spending)} / {formatCurrency(status.budget_limit)}
-          </Text>
-          <Text
-            variant="labelSmall"
-            style={{ color: colors.textTertiary }}
-          >
-            Umbral: {status.threshold_percentage}%
-          </Text>
-        </View>
-      </Card>
-    );
-  };
-
   // ── Renderizar cada alerta configurable ───────────────────────────────────
 
   const renderAlertItem = ({ item }: { item: BudgetAlertWithCategory }) => {
@@ -449,48 +486,6 @@ export default function BudgetAlertsScreen() {
       </Card>
     );
   };
-
-  // ── Cabecera de la lista ──────────────────────────────────────────────────
-
-  const ListHeaderComponent = useMemo(() => {
-    if (activeAlerts.length === 0) return null;
-
-    return (
-      <View>
-        {/* Seccion de estados de presupuesto */}
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="chart-bar"
-            size={20}
-            color={colors.primary}
-          />
-          <Text
-            variant="titleMedium"
-            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
-          >
-            Estado de presupuestos
-          </Text>
-        </View>
-
-        {activeAlerts.map(renderStatusCard)}
-
-        {/* Separador */}
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="cog-outline"
-            size={20}
-            color={colors.primary}
-          />
-          <Text
-            variant="titleMedium"
-            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
-          >
-            Configuracion de alertas
-          </Text>
-        </View>
-      </View>
-    );
-  }, [activeAlerts, statusMap, colors]);
 
   // ── Pantalla principal ────────────────────────────────────────────────────
 
