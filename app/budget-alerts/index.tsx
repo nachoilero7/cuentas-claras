@@ -125,6 +125,19 @@ export default function BudgetAlertsScreen() {
   const role = profile?.role ?? 'viewer';
   const isAdmin = role === 'admin';
 
+  // ── Mapa de estados de presupuesto por categoria ──────────────────────────
+  // NOTA: todos los hooks deben ir ANTES de los early returns (Rules of Hooks)
+
+  const statusMap = useMemo(() => {
+    const map = new Map<string, BudgetStatus>();
+    budgetStatuses?.forEach((s) => map.set(s.category_id, s));
+    return map;
+  }, [budgetStatuses]);
+
+  const activeAlerts = useMemo(() => {
+    return (alerts ?? []).filter((a) => a.is_active);
+  }, [alerts]);
+
   // ── Guard: solo admin puede acceder ──────────────────────────────────────
 
   if (!isProfileLoading && !isAdmin) {
@@ -252,20 +265,6 @@ export default function BudgetAlertsScreen() {
     refetchAlerts();
     refetchStatus();
   };
-
-  // ── Mapa de estados de presupuesto por categoria ──────────────────────────
-
-  const statusMap = useMemo(() => {
-    const map = new Map<string, BudgetStatus>();
-    budgetStatuses?.forEach((s) => map.set(s.category_id, s));
-    return map;
-  }, [budgetStatuses]);
-
-  // ── Alertas activas (para la seccion de estado) ────────────────────────────
-
-  const activeAlerts = useMemo(() => {
-    return (alerts ?? []).filter((a) => a.is_active);
-  }, [alerts]);
 
   // ── Renderizar tarjeta de estado de presupuesto ────────────────────────────
 

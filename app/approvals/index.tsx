@@ -164,6 +164,97 @@ export default function ApprovalsListScreen() {
     );
   }, [rejectingId, rejectComment, rejectMutation, authenticate]);
 
+  // ── Cabecera de la lista ──────────────────────────────────────────────────
+  // NOTA: todos los hooks deben ir ANTES de los early returns (Rules of Hooks)
+
+  const ListHeaderComponent = useMemo(() => {
+    return (
+      <View style={styles.sectionHeader}>
+        <MaterialCommunityIcons
+          name="clock-outline"
+          size={20}
+          color={colors.primary}
+        />
+        <Text
+          variant="titleMedium"
+          style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
+        >
+          Pendientes de aprobacion
+        </Text>
+      </View>
+    );
+  }, [colors]);
+
+  // ── Pie de la lista (aprobaciones revisadas) ──────────────────────────────
+
+  const ListFooterComponent = useMemo(() => {
+    if (reviewedApprovals.length === 0) return null;
+
+    return (
+      <View style={[styles.reviewedSection, { borderTopColor: colors.outlineVariant }]}>
+        <View style={styles.sectionHeader}>
+          <MaterialCommunityIcons
+            name="history"
+            size={20}
+            color={colors.textSecondary}
+          />
+          <Text
+            variant="titleMedium"
+            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
+          >
+            Revisadas recientemente
+          </Text>
+        </View>
+        {reviewedApprovals.map((item) => {
+          const tx = item.transaction;
+          const amountColor = tx?.type === 'income' ? colors.income : tx?.type === 'expense' ? colors.expense : tx?.type === 'transfer' ? colors.transfer : colors.textSecondary;
+          const formattedAmount = formatCurrency(tx?.amount ?? 0, (tx?.currency as CurrencyCode) ?? 'ARS');
+          const isApproved = item.status === 'approved';
+          const statusLabel = isApproved ? 'Aprobada' : 'Rechazada';
+          const statusColor = isApproved ? colors.success : colors.error;
+          const statusIcon = isApproved ? 'check-circle-outline' : 'close-circle-outline';
+
+          return (
+            <View key={item.id}>
+              <Card variant="outlined" padding="sm" style={{ marginBottom: spacing.sm }}>
+                <View style={styles.reviewedCardContent}>
+                  <View style={styles.reviewedInfo}>
+                    <Text
+                      variant="bodyMedium"
+                      style={{ color: colors.text, fontWeight: '600' }}
+                      numberOfLines={1}
+                    >
+                      {tx?.description ?? 'Sin descripcion'}
+                    </Text>
+                    <View style={styles.reviewedMeta}>
+                      <MaterialCommunityIcons
+                        name={statusIcon as keyof typeof MaterialCommunityIcons.glyphMap}
+                        size={14}
+                        color={statusColor}
+                      />
+                      <Text
+                        variant="labelSmall"
+                        style={{ color: statusColor, marginLeft: spacing.xxs, fontWeight: '600' }}
+                      >
+                        {statusLabel}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    variant="bodyMedium"
+                    style={{ color: amountColor, fontWeight: '700' }}
+                  >
+                    {formattedAmount}
+                  </Text>
+                </View>
+              </Card>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }, [reviewedApprovals, colors]);
+
   // ── Guard: solo admin o manager pueden acceder ────────────────────────────
 
   if (!isProfileLoading && !isAdmin && !isManager) {
@@ -378,107 +469,6 @@ export default function ApprovalsListScreen() {
       </Card>
     );
   };
-
-  // ── Renderizar cada aprobacion revisada ───────────────────────────────────
-
-  const renderReviewedItem = ({ item }: { item: ApprovalWithDetails }) => {
-    const tx = item.transaction;
-    const amountColor = tx?.type === 'income' ? colors.income : tx?.type === 'expense' ? colors.expense : tx?.type === 'transfer' ? colors.transfer : colors.textSecondary;
-    const formattedAmount = formatCurrency(tx?.amount ?? 0, (tx?.currency as CurrencyCode) ?? 'ARS');
-
-    const isApproved = item.status === 'approved';
-    const statusLabel = isApproved ? 'Aprobada' : 'Rechazada';
-    const statusColor = isApproved ? colors.success : colors.error;
-    const statusIcon = isApproved ? 'check-circle-outline' : 'close-circle-outline';
-
-    const cardStyle: import('react-native').ViewStyle = {
-      marginBottom: spacing.sm,
-    };
-
-    return (
-      <Card variant="outlined" padding="sm" style={cardStyle}>
-        <View style={styles.reviewedCardContent}>
-          <View style={styles.reviewedInfo}>
-            <Text
-              variant="bodyMedium"
-              style={{ color: colors.text, fontWeight: '600' }}
-              numberOfLines={1}
-            >
-              {tx?.description ?? 'Sin descripcion'}
-            </Text>
-            <View style={styles.reviewedMeta}>
-              <MaterialCommunityIcons
-                name={statusIcon as keyof typeof MaterialCommunityIcons.glyphMap}
-                size={14}
-                color={statusColor}
-              />
-              <Text
-                variant="labelSmall"
-                style={{ color: statusColor, marginLeft: spacing.xxs, fontWeight: '600' }}
-              >
-                {statusLabel}
-              </Text>
-            </View>
-          </View>
-          <Text
-            variant="bodyMedium"
-            style={{ color: amountColor, fontWeight: '700' }}
-          >
-            {formattedAmount}
-          </Text>
-        </View>
-      </Card>
-    );
-  };
-
-  // ── Cabecera de la lista ──────────────────────────────────────────────────
-
-  const ListHeaderComponent = useMemo(() => {
-    return (
-      <View style={styles.sectionHeader}>
-        <MaterialCommunityIcons
-          name="clock-outline"
-          size={20}
-          color={colors.primary}
-        />
-        <Text
-          variant="titleMedium"
-          style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
-        >
-          Pendientes de aprobacion
-        </Text>
-      </View>
-    );
-  }, [colors]);
-
-  // ── Pie de la lista (aprobaciones revisadas) ──────────────────────────────
-
-  const ListFooterComponent = useMemo(() => {
-    if (reviewedApprovals.length === 0) return null;
-
-    return (
-      <View style={[styles.reviewedSection, { borderTopColor: colors.outlineVariant }]}>
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="history"
-            size={20}
-            color={colors.textSecondary}
-          />
-          <Text
-            variant="titleMedium"
-            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
-          >
-            Revisadas recientemente
-          </Text>
-        </View>
-        {reviewedApprovals.map((item) => (
-          <View key={item.id}>
-            {renderReviewedItem({ item })}
-          </View>
-        ))}
-      </View>
-    );
-  }, [reviewedApprovals, colors]);
 
   // ── Pantalla principal ────────────────────────────────────────────────────
 

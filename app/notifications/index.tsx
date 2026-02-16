@@ -164,6 +164,53 @@ export default function NotificationsScreen() {
     );
   }, [notifications]);
 
+  // ── Cabecera con boton "Marcar todas como leidas" ─────────────────────────
+  // NOTA: todos los hooks deben ir ANTES de los early returns (Rules of Hooks)
+
+  const ListHeaderComponent = useMemo(() => {
+    if (!unreadCount || unreadCount === 0) return null;
+
+    return (
+      <View style={styles.headerActions}>
+        <View style={styles.unreadBadgeRow}>
+          <View style={[styles.unreadBadge, { backgroundColor: colors.primaryContainer }]}>
+            <Text
+              variant="labelMedium"
+              style={{ color: colors.primary, fontWeight: '700' }}
+            >
+              {unreadCount}
+            </Text>
+          </View>
+          <Text
+            variant="bodyMedium"
+            style={{ color: colors.textSecondary, marginLeft: spacing.sm }}
+          >
+            {unreadCount === 1 ? 'notificacion sin leer' : 'notificaciones sin leer'}
+          </Text>
+        </View>
+        <Pressable
+          style={styles.markAllButton}
+          onPress={handleMarkAllAsRead}
+          disabled={markAllAsReadMutation.isPending}
+          accessibilityRole="button"
+          accessibilityLabel="Marcar todas las notificaciones como leidas"
+        >
+          <MaterialCommunityIcons
+            name="check-all"
+            size={18}
+            color={colors.primary}
+          />
+          <Text
+            variant="labelMedium"
+            style={{ color: colors.primary, marginLeft: spacing.xs, fontWeight: '600' }}
+          >
+            Marcar todas como leidas
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }, [unreadCount, colors, handleMarkAllAsRead, markAllAsReadMutation.isPending]);
+
   // ── Estado de carga ────────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -303,52 +350,6 @@ export default function NotificationsScreen() {
       </Pressable>
     );
   };
-
-  // ── Cabecera con boton "Marcar todas como leidas" ─────────────────────────
-
-  const ListHeaderComponent = useMemo(() => {
-    if (!unreadCount || unreadCount === 0) return null;
-
-    return (
-      <View style={styles.headerActions}>
-        <View style={styles.unreadBadgeRow}>
-          <View style={[styles.unreadBadge, { backgroundColor: colors.primaryContainer }]}>
-            <Text
-              variant="labelMedium"
-              style={{ color: colors.primary, fontWeight: '700' }}
-            >
-              {unreadCount}
-            </Text>
-          </View>
-          <Text
-            variant="bodyMedium"
-            style={{ color: colors.textSecondary, marginLeft: spacing.sm }}
-          >
-            {unreadCount === 1 ? 'notificacion sin leer' : 'notificaciones sin leer'}
-          </Text>
-        </View>
-        <Pressable
-          style={styles.markAllButton}
-          onPress={handleMarkAllAsRead}
-          disabled={markAllAsReadMutation.isPending}
-          accessibilityRole="button"
-          accessibilityLabel="Marcar todas las notificaciones como leidas"
-        >
-          <MaterialCommunityIcons
-            name="check-all"
-            size={18}
-            color={colors.primary}
-          />
-          <Text
-            variant="labelMedium"
-            style={{ color: colors.primary, marginLeft: spacing.xs, fontWeight: '600' }}
-          >
-            Marcar todas como leidas
-          </Text>
-        </Pressable>
-      </View>
-    );
-  }, [unreadCount, colors, handleMarkAllAsRead, markAllAsReadMutation.isPending]);
 
   // ── Pantalla principal ────────────────────────────────────────────────────
 

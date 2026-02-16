@@ -89,12 +89,13 @@ function getSizeStyles(size: ButtonSize): { container: ViewStyle; label: TextSty
           height: componentHeight.buttonSm,
           paddingHorizontal: spacing.sm,
           borderRadius: borderRadius.sm,
+          gap: spacing.xs,
         },
         label: {
           fontSize: typography.body2.fontSize,
           lineHeight: typography.body2.lineHeight,
           marginVertical: 0,
-          marginHorizontal: spacing.xs,
+          marginHorizontal: spacing.sm,
         },
       };
     case 'md':
@@ -103,12 +104,13 @@ function getSizeStyles(size: ButtonSize): { container: ViewStyle; label: TextSty
           height: componentHeight.buttonMd,
           paddingHorizontal: spacing.md,
           borderRadius: borderRadius.md,
+          gap: spacing.sm,
         },
         label: {
           fontSize: typography.body1.fontSize,
           lineHeight: typography.body1.lineHeight,
           marginVertical: 0,
-          marginHorizontal: spacing.sm,
+          marginHorizontal: spacing.smd,
         },
       };
     case 'lg':
@@ -117,12 +119,13 @@ function getSizeStyles(size: ButtonSize): { container: ViewStyle; label: TextSty
           height: componentHeight.buttonLg,
           paddingHorizontal: spacing.lg,
           borderRadius: borderRadius.md,
+          gap: spacing.sm,
         },
         label: {
           fontSize: typography.subtitle.fontSize,
           lineHeight: typography.subtitle.lineHeight,
           marginVertical: 0,
-          marginHorizontal: spacing.sm,
+          marginHorizontal: spacing.smd,
         },
       };
   }

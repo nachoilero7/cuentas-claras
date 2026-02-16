@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -19,14 +19,15 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import {
+  useCategories,
   useCategory,
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
 } from '@/src/features/categories/hooks/useCategories';
+import { suggestIcon, pickUnusedColor } from '@/src/features/categories/utils/categoryDefaults';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
-import { IconPicker } from '@/src/shared/components/ui/IconPicker';
 import { showSnackbar } from '@/src/shared/lib/snackbar';
 import { spacing } from '@/src/shared/theme';
 
@@ -41,16 +42,6 @@ const categorySchema = z.object({
   description: z
     .string()
     .max(500, 'La descripcion no puede exceder 500 caracteres')
-    .optional()
-    .or(z.literal('')),
-  icon: z
-    .string()
-    .max(50, 'El icono no puede exceder 50 caracteres')
-    .optional()
-    .or(z.literal('')),
-  color: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Debe ser un color hexadecimal valido (ej: #FF5722)')
     .optional()
     .or(z.literal('')),
   budget_limit_ars: z
@@ -75,12 +66,19 @@ export default function CategoryFormScreen() {
   const isAdmin = role === 'admin';
 
   // Hooks de datos
+  const { data: categories } = useCategories();
   const { data: category, isLoading: isCategoryLoading, error: categoryError } = useCategory(
     isCreateMode ? '' : id!
   );
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
+
+  // Colores en uso por categorias existentes
+  const usedColors = useMemo(
+    () => (categories ?? []).map((c) => c.color).filter(Boolean) as string[],
+    [categories],
+  );
 
   // Estado del formulario
   const [name, setName] = useState('');
@@ -95,22 +93,28 @@ export default function CategoryFormScreen() {
 
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
-  const hasUnsavedChanges = useRef(false);
-  const isInitialMount = useRef(true);
+  const savedRef = useRef(false);
+  const colorAssignedRef = useRef(false);
 
-  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+  // Detectar cambios comparando contra valores originales (inmune a Strict Mode)
+  const hasUnsavedChanges = useCallback((): boolean => {
+    if (savedRef.current) return false;
+    if (isCreateMode) {
+      // Solo considerar campos editables por el usuario (nombre, descripcion, presupuestos)
+      return name.trim() !== '' || description.trim() !== '' ||
+        budgetArs.trim() !== '' || budgetUsd.trim() !== '';
     }
-    hasUnsavedChanges.current = true;
-  }, [name, description, icon, color, budgetArs, budgetUsd]);
+    if (!category) return false;
+    return name !== (category.name ?? '') ||
+      description !== (category.description ?? '') ||
+      budgetArs !== (category.budget_limit_ars !== null ? String(category.budget_limit_ars) : '') ||
+      budgetUsd !== (category.budget_limit_usd !== null ? String(category.budget_limit_usd) : '');
+  }, [isCreateMode, category, name, description, budgetArs, budgetUsd]);
 
   // Advertir al usuario si navega con cambios sin guardar
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!hasUnsavedChanges.current) return;
+      if (!hasUnsavedChanges()) return;
 
       e.preventDefault();
       Alert.alert(
@@ -123,7 +127,26 @@ export default function CategoryFormScreen() {
       );
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, hasUnsavedChanges]);
+
+  // Auto-asignar color en modo creacion (una sola vez)
+  useEffect(() => {
+    if (isCreateMode && !colorAssignedRef.current) {
+      colorAssignedRef.current = true;
+      setColor(pickUnusedColor(usedColors));
+    }
+  }, [isCreateMode, usedColors]);
+
+  // Auto-sugerir icono cuando cambia el nombre (solo en modo creacion)
+  useEffect(() => {
+    if (!isCreateMode) return;
+    const suggested = suggestIcon(name);
+    if (suggested) {
+      setIcon(suggested);
+    } else if (name.trim().length < 2) {
+      setIcon('');
+    }
+  }, [isCreateMode, name]);
 
   // Pre-rellenar en modo edicion
   useEffect(() => {
@@ -142,8 +165,6 @@ export default function CategoryFormScreen() {
           ? String(category.budget_limit_usd)
           : ''
       );
-      // Prefill no cuenta como cambio del usuario
-      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, category]);
 
@@ -153,8 +174,6 @@ export default function CategoryFormScreen() {
     const result = categorySchema.safeParse({
       name,
       description,
-      icon,
-      color,
       budget_limit_ars: budgetArs,
       budget_limit_usd: budgetUsd,
     });
@@ -195,7 +214,7 @@ export default function CategoryFormScreen() {
 
     setErrors({});
     return true;
-  }, [name, description, icon, color, budgetArs, budgetUsd]);
+  }, [name, description, budgetArs, budgetUsd]);
 
   // ── Enviar formulario ───────────────────────────────────────────────────────
 
@@ -214,7 +233,7 @@ export default function CategoryFormScreen() {
     try {
       if (isCreateMode) {
         const result = await createCategory.mutateAsync(payload);
-        hasUnsavedChanges.current = false;
+        savedRef.current = true;
         if (result) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Rubro creado exitosamente', 'success');
@@ -222,7 +241,7 @@ export default function CategoryFormScreen() {
         router.back();
       } else {
         const result = await updateCategory.mutateAsync({ id: id!, ...payload });
-        hasUnsavedChanges.current = false;
+        savedRef.current = true;
         if (result) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Rubro actualizado exitosamente', 'success');
@@ -275,7 +294,6 @@ export default function CategoryFormScreen() {
 
   const isSubmitting = createCategory.isPending || updateCategory.isPending;
   const isDeleting = deleteCategory.isPending;
-  const isColorValid = color.trim() === '' || /^#[0-9A-Fa-f]{6}$/.test(color.trim());
 
   // ── Estado de carga en modo edicion ───────────────────────────────────────
 
@@ -344,6 +362,32 @@ export default function CategoryFormScreen() {
               {isCreateMode ? 'Nuevo Rubro' : 'Editar Rubro'}
             </Text>
 
+            {/* Preview de icono y color auto-asignados */}
+            <View style={styles.autoPreviewRow}>
+              <View
+                style={[
+                  styles.autoPreviewIcon,
+                  { backgroundColor: color || colors.surfaceVariant },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={icon ? (icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) : 'tag-outline'}
+                  size={32}
+                  color="#fff"
+                />
+              </View>
+              <View style={styles.autoPreviewText}>
+                <Text variant="labelMedium" style={{ color: colors.textSecondary }}>
+                  {isCreateMode ? 'Icono y color automaticos' : 'Icono y color del rubro'}
+                </Text>
+                <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
+                  {isCreateMode
+                    ? 'Se asignan segun el nombre del rubro'
+                    : 'Se actualizan al cambiar el nombre'}
+                </Text>
+              </View>
+            </View>
+
             {/* Nombre */}
             <Input
               label="Nombre"
@@ -370,39 +414,6 @@ export default function CategoryFormScreen() {
               maxLength={500}
               autoCapitalize="sentences"
             />
-
-            {/* Icono */}
-            <IconPicker
-              label="Icono"
-              value={icon}
-              onSelect={setIcon}
-              error={errors.icon}
-            />
-
-            {/* Color */}
-            <View style={styles.colorRow}>
-              <View style={styles.colorInputWrapper}>
-                <Input
-                  label="Color"
-                  value={color}
-                  onChangeText={setColor}
-                  placeholder="#FF5722"
-                  leftIcon="palette-outline"
-                  error={errors.color}
-                  helperText="Color hexadecimal (ej: #FF5722)"
-                  maxLength={7}
-                  autoCapitalize="characters"
-                />
-              </View>
-              {color.trim() !== '' && isColorValid && (
-                <View
-                  style={[
-                    styles.colorPreview,
-                    { backgroundColor: color.trim() },
-                  ]}
-                />
-              )}
-            </View>
 
             {/* Presupuesto ARS */}
             <Input
@@ -500,21 +511,24 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
-  colorRow: {
+  autoPreviewRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.smd,
+    paddingVertical: spacing.smd,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  colorInputWrapper: {
+  autoPreviewIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoPreviewText: {
     flex: 1,
-  },
-  colorPreview: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginTop: spacing.sm,
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.1)',
+    gap: 2,
   },
   submitSection: {
     marginTop: spacing.md,
