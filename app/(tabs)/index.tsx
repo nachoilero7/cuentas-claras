@@ -13,7 +13,6 @@ import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { CartesianChart, Bar, BarGroup } from 'victory-native';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -22,7 +21,7 @@ import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
 import {
   useDashboardSummary,
   useMonthlyBreakdown,
-  useCategoryBreakdown,
+  useCategoryBalances,
 } from '@/src/features/dashboard/hooks/useDashboard';
 import { useRecurringTransactions } from '@/src/features/recurring/hooks/useRecurring';
 import { useBudgetStatus } from '@/src/features/budget/hooks/useBudgetAlerts';
@@ -104,8 +103,6 @@ const SummaryCard = React.memo(function SummaryCard({
   );
 });
 
-// (Graficos Victory Native se renderizan inline en el dashboard)
-
 // ── Componente principal: Dashboard ────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -127,9 +124,7 @@ export default function DashboardScreen() {
   } = useDashboardSummary(currentSeason?.id);
 
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyBreakdown(currentSeason?.id);
-  const { data: categoryData, isLoading: categoryLoading } = useCategoryBreakdown({
-    seasonId: currentSeason?.id,
-  });
+  const { data: categoryBalances, isLoading: categoryLoading } = useCategoryBalances(currentSeason?.id);
 
   // Datos de recurrentes y presupuestos para indicadores
   const { data: recurringData } = useRecurringTransactions();
@@ -162,11 +157,25 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [queryClient]);
 
-  // Calcular totales y porcentajes de categorias
-  const categoryTotal = useMemo(() => {
-    if (!categoryData || categoryData.length === 0) return 0;
-    return categoryData.reduce((sum, cat) => sum + (cat.total_ars ?? 0), 0);
-  }, [categoryData]);
+  // Categorias activas con balance, ordenadas por balance descendente
+  const activeBalances = useMemo(() => {
+    if (!categoryBalances || categoryBalances.length === 0) return [];
+    return categoryBalances
+      .filter((b) => b.is_active)
+      .sort((a, b) => b.balance_ars - a.balance_ars);
+  }, [categoryBalances]);
+
+  // Valor maximo absoluto para escala de barras
+  const maxAbsBalance = useMemo(() => {
+    if (activeBalances.length === 0) return 0;
+    return Math.max(...activeBalances.map((b) => Math.abs(b.balance_ars)), 1);
+  }, [activeBalances]);
+
+  // Valor maximo para escala del grafico mensual
+  const monthlyMax = useMemo(() => {
+    if (!monthlyData || monthlyData.length === 0) return 0;
+    return Math.max(...monthlyData.flatMap((m) => [m.income, m.expenses]), 1);
+  }, [monthlyData]);
 
   // Recurrentes vencidas (next_execution <= hoy y activas)
   const overdueRecurringCount = useMemo(() => {
@@ -475,46 +484,69 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={{ height: 220 }}>
-                <CartesianChart
-                  data={monthlyData as unknown as Record<string, unknown>[]}
-                  xKey={"label" as never}
-                  yKeys={["income", "expenses"] as never[]}
-                  domainPadding={{ left: 30, right: 30, top: 10 }}
-                  axisOptions={{
-                    labelColor: colors.textSecondary,
-                    lineColor: colors.outlineVariant,
-                  }}
-                >
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {({ points, chartBounds }: any) => (
-                    <BarGroup
-                      chartBounds={chartBounds}
-                      betweenGroupPadding={0.3}
-                      withinGroupPadding={0.1}
-                    >
-                      <BarGroup.Bar
-                        points={points.income}
-                        color={colors.income}
-                        animate={{ type: 'spring' }}
-                      />
-                      <BarGroup.Bar
-                        points={points.expenses}
-                        color={colors.expense}
-                        animate={{ type: 'spring' }}
-                      />
-                    </BarGroup>
-                  )}
-                </CartesianChart>
+              <View style={styles.chartContainer}>
+                {/* Area de barras */}
+                <View style={styles.chartBarsArea}>
+                  {monthlyData.map((month) => {
+                    const incomeH = monthlyMax > 0 ? (month.income / monthlyMax) * 140 : 0;
+                    const expenseH = monthlyMax > 0 ? (month.expenses / monthlyMax) * 140 : 0;
+                    return (
+                      <View key={month.month} style={styles.monthGroup}>
+                        <View style={styles.monthBars}>
+                          <View
+                            style={[
+                              styles.monthBar,
+                              { height: Math.max(incomeH, 2), backgroundColor: colors.income },
+                            ]}
+                          />
+                          <View
+                            style={[
+                              styles.monthBar,
+                              { height: Math.max(expenseH, 2), backgroundColor: colors.expense },
+                            ]}
+                          />
+                        </View>
+                        <Text
+                          variant="labelSmall"
+                          style={[styles.monthLabel, { color: colors.textTertiary }]}
+                          numberOfLines={1}
+                        >
+                          {month.label.split(' ')[0]}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                {/* Montos debajo del grafico */}
+                <View style={[styles.chartSummaryRow, { borderTopColor: colors.outlineVariant }]}>
+                  {monthlyData.map((month) => (
+                    <View key={`amt-${month.month}`} style={styles.monthAmounts}>
+                      <Text
+                        variant="labelSmall"
+                        style={{ color: colors.income, fontSize: 9 }}
+                        numberOfLines={1}
+                      >
+                        {formatCurrency(month.income)}
+                      </Text>
+                      <Text
+                        variant="labelSmall"
+                        style={{ color: colors.expense, fontSize: 9 }}
+                        numberOfLines={1}
+                      >
+                        {formatCurrency(month.expenses)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
           </Card>
 
-          {/* ── Distribucion de egresos por categoria ─────────────────── */}
+          {/* ── Balance por rubro ──────────────────────────────────────── */}
           <Card variant="elevated" padding="md" style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons
-                name="tag-multiple"
+                name="wallet-outline"
                 size={22}
                 color={colors.primary}
               />
@@ -522,7 +554,7 @@ export default function DashboardScreen() {
                 variant="titleMedium"
                 style={[styles.sectionTitle, { color: colors.text }]}
               >
-                Distribucion de egresos
+                Balance por rubro
               </Text>
             </View>
 
@@ -530,7 +562,7 @@ export default function DashboardScreen() {
               <View style={styles.chartLoading}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ) : !categoryData || categoryData.length === 0 ? (
+            ) : activeBalances.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons
                   name="tag-off-outline"
@@ -541,81 +573,82 @@ export default function DashboardScreen() {
                   variant="bodyMedium"
                   style={{ color: colors.textSecondary, marginTop: spacing.sm }}
                 >
-                  Sin datos de egresos
+                  Sin rubros con movimientos
                 </Text>
               </View>
             ) : (
-              <View style={{ height: Math.max(180, categoryData.length * 44) }}>
-                <CartesianChart
-                  data={categoryData.map((cat) => ({
-                    category_name: cat.category_name,
-                    total_ars: cat.total_ars ?? 0,
-                  })) as unknown as Record<string, unknown>[]}
-                  xKey={"category_name" as never}
-                  yKeys={["total_ars"] as never[]}
-                  domainPadding={{ left: 10, right: 10, top: 10 }}
-                  axisOptions={{
-                    labelColor: colors.textSecondary,
-                    lineColor: colors.outlineVariant,
-                  }}
-                >
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {({ points, chartBounds }: any) => (
-                    <Bar
-                      points={points.total_ars}
-                      chartBounds={chartBounds}
-                      color={colors.expense}
-                      animate={{ type: 'spring' }}
-                      roundedCorners={{ topLeft: 4, topRight: 4 }}
-                    />
-                  )}
-                </CartesianChart>
-              </View>
-            )}
-
-            {/* Leyenda de categorias (clickeable) */}
-            {categoryData && categoryData.length > 0 && (
-              <View style={styles.categoryLegend}>
-                {categoryData.map((cat) => {
-                  const pct = categoryTotal > 0
-                    ? ((cat.total_ars ?? 0) / categoryTotal) * 100
+              <View style={styles.categoryBalanceList}>
+                {activeBalances.map((cat) => {
+                  const barColor = cat.balance_ars >= 0 ? colors.income : colors.expense;
+                  const barWidth = maxAbsBalance > 0
+                    ? (Math.abs(cat.balance_ars) / maxAbsBalance) * 100
                     : 0;
+                  const hasTransfers = cat.net_transfers_ars !== 0;
+
                   return (
                     <Pressable
                       key={cat.category_id}
-                      style={styles.categoryLegendItem}
+                      style={styles.categoryBalanceRow}
                       onPress={() => router.push({
                         pathname: '/(tabs)/transactions',
-                        params: { categoryId: cat.category_id, type: 'expense' },
+                        params: { categoryId: cat.category_id },
                       })}
                       accessibilityRole="button"
-                      accessibilityLabel={`${cat.category_name}: ${formatCurrency(cat.total_ars)}`}
+                      accessibilityLabel={`${cat.category_name}: ${formatCurrency(cat.balance_ars)}`}
                     >
-                      <View
-                        style={[
-                          styles.categoryLegendDot,
-                          { backgroundColor: cat.color ?? colors.expense },
-                        ]}
-                      />
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: colors.text, flex: 1 }}
-                        numberOfLines={1}
-                      >
-                        {cat.category_name}
-                      </Text>
-                      <Text
-                        variant="labelSmall"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        {pct.toFixed(1)}%
-                      </Text>
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: colors.text, fontWeight: '600', marginLeft: spacing.xs }}
-                      >
-                        {formatCurrency(cat.total_ars)}
-                      </Text>
+                      {/* Nombre y balance */}
+                      <View style={styles.categoryBalanceHeader}>
+                        <View style={styles.categoryBalanceNameRow}>
+                          <View
+                            style={[
+                              styles.categoryBalanceDot,
+                              { backgroundColor: cat.color ?? colors.primary },
+                            ]}
+                          />
+                          <Text
+                            variant="bodyMedium"
+                            style={{ color: colors.text, flex: 1, fontWeight: '500' }}
+                            numberOfLines={1}
+                          >
+                            {cat.category_name}
+                          </Text>
+                          <Text
+                            variant="titleSmall"
+                            style={{ color: barColor, fontWeight: '700' }}
+                          >
+                            {formatCurrency(cat.balance_ars)}
+                          </Text>
+                        </View>
+                        {/* Detalle: ingresos, egresos, transferencias */}
+                        <View style={styles.categoryBalanceDetail}>
+                          <Text variant="labelSmall" style={{ color: colors.income }}>
+                            +{formatCurrency(cat.total_income_ars)}
+                          </Text>
+                          <Text variant="labelSmall" style={{ color: colors.expense }}>
+                            -{formatCurrency(cat.total_expenses_ars)}
+                          </Text>
+                          {hasTransfers && (
+                            <Text
+                              variant="labelSmall"
+                              style={{ color: cat.net_transfers_ars >= 0 ? colors.income : colors.expense }}
+                            >
+                              {cat.net_transfers_ars >= 0 ? '+' : ''}{formatCurrency(cat.net_transfers_ars)} transf.
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      {/* Barra de balance */}
+                      <View style={[styles.categoryBalanceBarBg, { backgroundColor: colors.outlineVariant + '40' }]}>
+                        <View
+                          style={[
+                            styles.categoryBalanceBarFill,
+                            {
+                              backgroundColor: barColor,
+                              width: `${Math.max(barWidth, 2)}%`,
+                            },
+                          ]}
+                        />
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -821,7 +854,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Leyenda del grafico
+  // Leyenda del grafico mensual
   legendRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -838,21 +871,81 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
 
-  // Leyenda de categorias
-  categoryLegend: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
+  // Grafico mensual custom
+  chartContainer: {
+    gap: spacing.xs,
   },
-  categoryLegendItem: {
+  chartBarsArea: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    height: 160,
+    paddingHorizontal: spacing.xs,
+  },
+  monthGroup: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  monthBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  monthBar: {
+    width: 14,
+    borderRadius: 3,
+    minHeight: 2,
+  },
+  monthLabel: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  chartSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  monthAmounts: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 1,
+  },
+
+  // Balance por rubro
+  categoryBalanceList: {
+    gap: spacing.smd,
+  },
+  categoryBalanceRow: {
+    gap: spacing.xs,
+  },
+  categoryBalanceHeader: {
+    gap: spacing.xxs,
+  },
+  categoryBalanceNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.xxs,
   },
-  categoryLegendDot: {
+  categoryBalanceDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  categoryBalanceDetail: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingLeft: 20,
+  },
+  categoryBalanceBarBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  categoryBalanceBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
 
   // Seccion informativa (no-admin)
