@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Pressable,
+  Image,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -186,10 +187,10 @@ export default function DashboardScreen() {
     ).length;
   }, [recurringData]);
 
-  // Alertas de presupuesto sobre el umbral
-  const overBudgetCount = useMemo(() => {
+  // Alertas de balance disparadas
+  const triggeredAlertCount = useMemo(() => {
     if (!budgetStatuses || budgetStatuses.length === 0) return 0;
-    return budgetStatuses.filter((s) => s.is_over_threshold).length;
+    return budgetStatuses.filter((s) => s.is_triggered).length;
   }, [budgetStatuses]);
 
   // Balance colores
@@ -250,16 +251,11 @@ export default function DashboardScreen() {
               Temporada: {currentSeason?.name ?? 'Sin temporada activa'}
             </Text>
           </View>
-          <View
-            style={[
-              styles.welcomeIconContainer,
-              { backgroundColor: colors.primaryContainer },
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="hand-wave"
-              size={28}
-              color={colors.primary}
+          <View style={styles.welcomeLogoContainer}>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.welcomeLogo}
+              resizeMode="cover"
             />
           </View>
         </View>
@@ -397,34 +393,34 @@ export default function DashboardScreen() {
                 styles.counterChip,
                 {
                   backgroundColor: colors.surface,
-                  borderWidth: overBudgetCount > 0 ? 1 : 0,
-                  borderColor: overBudgetCount > 0 ? colors.error : 'transparent',
+                  borderWidth: triggeredAlertCount > 0 ? 1 : 0,
+                  borderColor: triggeredAlertCount > 0 ? colors.error : 'transparent',
                 },
               ]}
               onPress={() => router.push('/budget-alerts')}
               accessibilityRole="button"
               accessibilityLabel={
-                overBudgetCount > 0
-                  ? `${overBudgetCount} alertas de presupuesto activas`
-                  : 'Ver presupuestos'
+                triggeredAlertCount > 0
+                  ? `${triggeredAlertCount} alertas de balance activas`
+                  : 'Ver alertas de balance'
               }
             >
               <MaterialCommunityIcons
                 name="alert-circle-outline"
                 size={18}
-                color={overBudgetCount > 0 ? colors.error : colors.primary}
+                color={triggeredAlertCount > 0 ? colors.error : colors.primary}
               />
               <Text
                 variant="labelMedium"
                 style={{
-                  color: overBudgetCount > 0 ? colors.error : colors.text,
+                  color: triggeredAlertCount > 0 ? colors.error : colors.text,
                   marginLeft: spacing.xs,
-                  fontWeight: overBudgetCount > 0 ? '600' : '400',
+                  fontWeight: triggeredAlertCount > 0 ? '600' : '400',
                 }}
               >
-                {overBudgetCount > 0
-                  ? `${overBudgetCount} sobre limite`
-                  : 'Presupuestos'}
+                {triggeredAlertCount > 0
+                  ? `${triggeredAlertCount} alerta${triggeredAlertCount > 1 ? 's' : ''}`
+                  : 'Alertas'}
               </Text>
             </Pressable>
           </View>
@@ -766,13 +762,17 @@ const styles = StyleSheet.create({
   greeting: {
     fontWeight: '700',
   },
-  welcomeIconContainer: {
+  welcomeLogoContainer: {
     width: 48,
     height: 48,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 24,
+    backgroundColor: '#8B1A1A',
+    overflow: 'hidden',
     marginLeft: spacing.md,
+  },
+  welcomeLogo: {
+    width: 48,
+    height: 48,
   },
 
   // Tarjetas de resumen

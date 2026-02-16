@@ -82,21 +82,36 @@ export async function createNotification(notificationData: {
   return { data: data as Notification | null, error };
 }
 
-// ─── Crear notificaciones de alerta de presupuesto para multiples usuarios ──
+// ─── Crear notificaciones de alerta de balance para multiples usuarios ──────
 
-export async function createBudgetAlertNotification(
+export async function createBalanceAlertNotification(
   categoryName: string,
-  percentage: number,
+  alertType: 'below' | 'above',
+  thresholdAmount: number,
+  currentBalance: number,
   targetUserIds: string[]
 ) {
+  const formattedThreshold = `$${thresholdAmount.toLocaleString('es-AR')}`;
+  const formattedBalance = `$${currentBalance.toLocaleString('es-AR')}`;
+
+  const title = alertType === 'below'
+    ? `Balance bajo: ${categoryName}`
+    : `Balance alto: ${categoryName}`;
+
+  const body = alertType === 'below'
+    ? `El balance de "${categoryName}" (${formattedBalance}) esta por debajo de ${formattedThreshold}.`
+    : `El balance de "${categoryName}" (${formattedBalance}) alcanzo o supero ${formattedThreshold}.`;
+
   const notifications = targetUserIds.map((userId) => ({
     user_id: userId,
-    title: `Alerta de presupuesto: ${categoryName}`,
-    body: `El gasto en "${categoryName}" ha alcanzado el ${Math.round(percentage)}% del presupuesto asignado.`,
-    type: 'budget_alert',
+    title,
+    body,
+    type: 'balance_alert',
     data: {
       category_name: categoryName,
-      percentage_used: percentage,
+      alert_type: alertType,
+      threshold_amount: thresholdAmount,
+      current_balance: currentBalance,
     },
   }));
 

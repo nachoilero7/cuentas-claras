@@ -115,6 +115,17 @@ export default function TransactionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  // Sincronizar filtros con params de navegacion (ej: al volver al tab sin params)
+  useEffect(() => {
+    setActiveCategoryId(params.categoryId || undefined);
+  }, [params.categoryId]);
+
+  useEffect(() => {
+    if (params.type) {
+      setActiveFilter(params.type as FilterType);
+    }
+  }, [params.type]);
+
   // Debounce de busqueda: actualizar 300ms despues de dejar de escribir
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -247,6 +258,16 @@ export default function TransactionsScreen() {
             </View>
             <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
           </View>
+          {activeCategoryId && (
+            <Chip
+              icon="tag"
+              onClose={() => setActiveCategoryId(undefined)}
+              style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
+              textStyle={{ fontSize: 12 }}
+            >
+              Filtrando por rubro
+            </Chip>
+          )}
         </View>
 
         <EmptyState
@@ -267,8 +288,21 @@ export default function TransactionsScreen() {
                 ? 'No hay movimientos que coincidan con los filtros aplicados.'
                 : 'Registra tu primer movimiento para empezar a llevar el control de tus finanzas.'
           }
-          actionLabel={canCreate ? 'Nuevo movimiento' : undefined}
-          onAction={canCreate ? handleNavigateToNew : undefined}
+          actionLabel={
+            (activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId || debouncedSearch)
+              ? 'Limpiar filtros'
+              : canCreate ? 'Nuevo movimiento' : undefined
+          }
+          onAction={
+            (activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId || debouncedSearch)
+              ? () => {
+                  setActiveFilter('all');
+                  setActiveDateFilter('all');
+                  setActiveCategoryId(undefined);
+                  setSearchQuery('');
+                }
+              : canCreate ? handleNavigateToNew : undefined
+          }
         />
 
         {canCreate && (

@@ -1,7 +1,11 @@
 import { supabase } from '@/src/core/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { BudgetAlert } from '@/src/core/types/database';
-import { createBudgetAlertNotification } from './notificationService';
+import type { BudgetAlert, BalanceAlertType } from '@/src/core/types/database';
+import { createBalanceAlertNotification } from './notificationService';
+import {
+  notifyBalanceAlert,
+  sendPushToAdminsAndManagers,
+} from '@/src/core/services/pushNotifications';
 
 // ─── Tipos extendidos para alertas con datos de categoria ───────────────────
 
@@ -11,25 +15,24 @@ export interface BudgetAlertWithCategory extends BudgetAlert {
     name: string;
     color: string | null;
     icon: string | null;
-    budget_limit_ars: number | null;
   } | null;
 }
 
 export interface BudgetStatus {
+  alert_id: string;
   category_id: string;
   category_name: string;
-  budget_limit: number;
-  current_spending: number;
-  percentage_used: number;
-  threshold_percentage: number;
-  is_over_threshold: boolean;
+  alert_type: BalanceAlertType;
+  threshold_amount: number;
+  current_balance: number;
+  is_triggered: boolean;
 }
 
 // ─── Select con join de categoria ───────────────────────────────────────────
 
 const ALERT_SELECT = `
   *,
-  category:categories!category_id(id, name, color, icon, budget_limit_ars)
+  category:categories!category_id(id, name, color, icon)
 `;
 
 // ─── Obtener todas las alertas de presupuesto con info de categoria ─────────
@@ -43,28 +46,28 @@ export async function getBudgetAlerts() {
   return { data: (data as BudgetAlertWithCategory[] | null) ?? [], error };
 }
 
-// ─── Obtener la alerta configurada para una categoria especifica ────────────
+// ─── Obtener alertas configuradas para una categoria especifica ─────────────
 
-export async function getBudgetAlertByCategory(categoryId: string) {
+export async function getBudgetAlertsByCategory(categoryId: string) {
   const { data, error } = await supabase
     .from('budget_alerts')
     .select(ALERT_SELECT)
-    .eq('category_id', categoryId)
-    .single();
+    .eq('category_id', categoryId);
 
-  return { data: data as BudgetAlertWithCategory | null, error };
+  return { data: (data as BudgetAlertWithCategory[] | null) ?? [], error };
 }
 
-// ─── Crear o actualizar una alerta de presupuesto (upsert on category_id) ──
+// ─── Crear o actualizar una alerta de balance (upsert on category_id + alert_type)
 
 export async function upsertBudgetAlert(alertData: {
   category_id: string;
-  threshold_percentage: number;
+  alert_type: BalanceAlertType;
+  threshold_amount: number;
   is_active: boolean;
 }) {
   const { data, error } = await supabase
     .from('budget_alerts')
-    .upsert(alertData, { onConflict: 'category_id' })
+    .upsert(alertData, { onConflict: 'category_id,alert_type' })
     .select(ALERT_SELECT)
     .single();
 
@@ -84,58 +87,13 @@ export async function deleteBudgetAlert(id: string) {
   return { data: data as BudgetAlert | null, error };
 }
 
-// ─── Verificar el estado del presupuesto para una categoria ────────────────
+// ─── Verificar el estado de todas las alertas activas contra balances ──────
 
-export async function checkBudgetStatus(categoryId: string): Promise<{ data: BudgetStatus | null; error: Error | null }> {
-  // Obtener la alerta configurada para la categoria
-  const { data: alert, error: alertError } = await supabase
-    .from('budget_alerts')
-    .select('threshold_percentage')
-    .eq('category_id', categoryId)
-    .eq('is_active', true)
-    .single();
-
-  if (alertError) {
-    return { data: null, error: alertError };
-  }
-
-  // Obtener el balance actual desde la vista category_balances
-  const { data: balance, error: balanceError } = await supabase
-    .from('category_balances')
-    .select('category_name, budget_limit_ars, total_expenses_ars')
-    .eq('category_id', categoryId)
-    .single();
-
-  if (balanceError) {
-    return { data: null, error: balanceError };
-  }
-
-  const budgetLimit = balance.budget_limit_ars ?? 0;
-  const currentSpending = balance.total_expenses_ars ?? 0;
-  const thresholdPercentage = alert.threshold_percentage;
-  const percentageUsed = budgetLimit > 0 ? (currentSpending / budgetLimit) * 100 : 0;
-
-  return {
-    data: {
-      category_id: categoryId,
-      category_name: balance.category_name,
-      budget_limit: budgetLimit,
-      current_spending: currentSpending,
-      percentage_used: Math.round(percentageUsed * 100) / 100,
-      threshold_percentage: thresholdPercentage,
-      is_over_threshold: percentageUsed >= thresholdPercentage,
-    },
-    error: null,
-  };
-}
-
-// ─── Verificar el presupuesto de todas las categorias con alertas activas ──
-
-export async function checkAllBudgets(): Promise<{ data: BudgetStatus[]; error: Error | null }> {
+export async function checkAllBudgets(seasonId?: string): Promise<{ data: BudgetStatus[]; error: Error | null }> {
   // Obtener todas las alertas activas
   const { data: alerts, error: alertsError } = await supabase
     .from('budget_alerts')
-    .select('category_id, threshold_percentage')
+    .select('id, category_id, alert_type, threshold_amount')
     .eq('is_active', true);
 
   if (alertsError) {
@@ -146,43 +104,49 @@ export async function checkAllBudgets(): Promise<{ data: BudgetStatus[]; error: 
     return { data: [], error: null };
   }
 
-  // Obtener los balances de todas las categorias con alertas activas
-  const categoryIds = alerts.map((a) => a.category_id);
-  const { data: balances, error: balancesError } = await supabase
-    .from('category_balances')
-    .select('category_id, category_name, budget_limit_ars, total_expenses_ars')
-    .in('category_id', categoryIds);
+  // Obtener balances reales via RPC
+  const { data: balancesJson, error: balancesError } = await supabase.rpc(
+    'get_category_balances',
+    { p_season_id: seasonId ?? null },
+  );
 
   if (balancesError) {
     return { data: [], error: balancesError };
   }
 
-  // Construir el mapa de balances por category_id
+  // Construir mapa de balances por category_id
+  const balances = (balancesJson ?? []) as Array<{
+    category_id: string;
+    category_name: string;
+    balance_ars: number;
+  }>;
+
   const balanceMap = new Map(
-    (balances ?? []).map((b) => [b.category_id, b])
+    balances.map((b) => [b.category_id, b]),
   );
 
-  // Calcular el estado de cada alerta
+  // Evaluar cada alerta
   const statuses: BudgetStatus[] = alerts
     .map((alert) => {
       const balance = balanceMap.get(alert.category_id);
-      if (!balance) return null;
+      const currentBalance = balance?.balance_ars ?? 0;
 
-      const budgetLimit = balance.budget_limit_ars ?? 0;
-      const currentSpending = balance.total_expenses_ars ?? 0;
-      const percentageUsed = budgetLimit > 0 ? (currentSpending / budgetLimit) * 100 : 0;
+      const isTriggered =
+        alert.alert_type === 'below'
+          ? currentBalance < alert.threshold_amount
+          : currentBalance >= alert.threshold_amount;
 
       return {
+        alert_id: alert.id,
         category_id: alert.category_id,
-        category_name: balance.category_name,
-        budget_limit: budgetLimit,
-        current_spending: currentSpending,
-        percentage_used: Math.round(percentageUsed * 100) / 100,
-        threshold_percentage: alert.threshold_percentage,
-        is_over_threshold: percentageUsed >= alert.threshold_percentage,
+        category_name: balance?.category_name ?? '',
+        alert_type: alert.alert_type as BalanceAlertType,
+        threshold_amount: alert.threshold_amount,
+        current_balance: currentBalance,
+        is_triggered: isTriggered,
       };
     })
-    .filter((s): s is BudgetStatus => s !== null);
+    .filter((s) => s.category_name !== '');
 
   return { data: statuses, error: null };
 }
@@ -190,7 +154,7 @@ export async function checkAllBudgets(): Promise<{ data: BudgetStatus[]; error: 
 const BUDGET_ALERT_LAST_CHECK_KEY = '@cuentas_claras:budget_alert_last_check';
 const MIN_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 horas entre chequeos
 
-// ─── Despachar notificaciones de alertas de presupuesto ─────────────────────
+// ─── Despachar notificaciones de alertas de balance ─────────────────────────
 
 export async function dispatchBudgetAlertNotifications(): Promise<{
   notified: number;
@@ -209,15 +173,15 @@ export async function dispatchBudgetAlertNotifications(): Promise<{
       }
     }
 
-    // Verificar presupuestos
+    // Verificar alertas
     const { data: statuses, error: statusError } = await checkAllBudgets();
     if (statusError) {
       return { notified: 0, errors: [statusError.message] };
     }
 
-    // Filtrar solo los que exceden el umbral
-    const overThreshold = statuses.filter((s) => s.is_over_threshold);
-    if (overThreshold.length === 0) {
+    // Filtrar solo los que se dispararon
+    const triggered = statuses.filter((s) => s.is_triggered);
+    if (triggered.length === 0) {
       await AsyncStorage.setItem(BUDGET_ALERT_LAST_CHECK_KEY, Date.now().toString());
       return { notified: 0, errors: [] };
     }
@@ -235,12 +199,15 @@ export async function dispatchBudgetAlertNotifications(): Promise<{
 
     const targetUserIds = targetUsers.map((u) => u.id);
 
-    // Crear notificaciones para cada categoria sobre el umbral
-    for (const status of overThreshold) {
+    // Crear notificaciones in-app + push para cada alerta disparada
+    for (const status of triggered) {
       try {
-        const { error: notifError } = await createBudgetAlertNotification(
+        // 1. Notificacion in-app (guardada en DB)
+        const { error: notifError } = await createBalanceAlertNotification(
           status.category_name,
-          status.percentage_used,
+          status.alert_type,
+          status.threshold_amount,
+          status.current_balance,
           targetUserIds,
         );
 
@@ -249,6 +216,30 @@ export async function dispatchBudgetAlertNotifications(): Promise<{
         } else {
           notified++;
         }
+
+        // 2. Notificacion local (bell + sonido en el dispositivo actual)
+        await notifyBalanceAlert(
+          status.category_name,
+          status.alert_type,
+          status.threshold_amount,
+          status.current_balance,
+        );
+
+        // 3. Push notification a todos los admin/manager (otros dispositivos)
+        const formattedThreshold = `$${status.threshold_amount.toLocaleString('es-AR')}`;
+        const formattedBalance = `$${status.current_balance.toLocaleString('es-AR')}`;
+        const pushTitle = status.alert_type === 'below'
+          ? `Balance bajo: ${status.category_name}`
+          : `Balance alto: ${status.category_name}`;
+        const pushBody = status.alert_type === 'below'
+          ? `Balance (${formattedBalance}) por debajo de ${formattedThreshold}`
+          : `Balance (${formattedBalance}) alcanzo ${formattedThreshold}`;
+
+        await sendPushToAdminsAndManagers(
+          pushTitle,
+          pushBody,
+          { type: 'balance_alert', category: status.category_name, alert_type: status.alert_type },
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Error desconocido';
         errors.push(`${status.category_name}: ${msg}`);

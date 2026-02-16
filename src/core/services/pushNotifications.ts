@@ -87,10 +87,9 @@ export async function savePushToken(token: string): Promise<void> {
 
   if (authError || !user) return;
 
-  // Guardar token en el perfil (campo push_token si existe, sino en metadata)
   await supabase
     .from('profiles')
-    .update({ push_token: token } as any)
+    .update({ push_token: token })
     .eq('id', user.id);
 }
 
@@ -137,14 +136,27 @@ export async function notifyApprovalResult(
   );
 }
 
-export async function notifyBudgetThreshold(
+export async function notifyBalanceAlert(
   categoryName: string,
-  percentage: number,
+  alertType: 'below' | 'above',
+  thresholdAmount: number,
+  currentBalance: number,
 ) {
+  const formattedThreshold = `$${thresholdAmount.toLocaleString('es-AR')}`;
+  const formattedBalance = `$${currentBalance.toLocaleString('es-AR')}`;
+
+  const title = alertType === 'below'
+    ? `Balance bajo: ${categoryName}`
+    : `Balance alto: ${categoryName}`;
+
+  const body = alertType === 'below'
+    ? `El balance de "${categoryName}" (${formattedBalance}) esta por debajo de ${formattedThreshold}.`
+    : `El balance de "${categoryName}" (${formattedBalance}) alcanzo o supero ${formattedThreshold}.`;
+
   await sendLocalNotification(
-    'Alerta de presupuesto',
-    `El rubro "${categoryName}" alcanzo el ${Math.round(percentage)}% de su presupuesto.`,
-    { type: 'budget_alert', category: categoryName, percentage },
+    title,
+    body,
+    { type: 'balance_alert', category: categoryName, alert_type: alertType },
     'budget',
   );
 }
@@ -160,8 +172,23 @@ export async function getAdminPushTokens(): Promise<string[]> {
     .not('push_token', 'is', null);
 
   return (data ?? [])
-    .map((p: any) => p.push_token as string)
-    .filter(Boolean);
+    .map((p) => (p as { push_token: string | null }).push_token)
+    .filter((t): t is string => !!t);
+}
+
+// ─── Obtener tokens de push de admin y manager ──────────────────────────────
+
+export async function getAdminManagerPushTokens(): Promise<string[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('push_token')
+    .in('role', ['admin', 'manager'])
+    .eq('is_active', true)
+    .not('push_token', 'is', null);
+
+  return (data ?? [])
+    .map((p) => (p as { push_token: string | null }).push_token)
+    .filter((t): t is string => !!t);
 }
 
 // ─── Obtener token de push de un usuario especifico ────────────────────────
@@ -173,7 +200,7 @@ export async function getUserPushToken(userId: string): Promise<string | null> {
     .eq('id', userId)
     .single();
 
-  return (data as any)?.push_token ?? null;
+  return (data as { push_token: string | null } | null)?.push_token ?? null;
 }
 
 // ─── Enviar push notifications via Expo Push API ───────────────────────────
@@ -216,6 +243,18 @@ export async function sendPushToAdmins(
 ) {
   const tokens = await getAdminPushTokens();
   await sendExpoPush(tokens, title, body, data);
+}
+
+// ─── Notificar a administradores y managers ────────────────────────────────
+
+export async function sendPushToAdminsAndManagers(
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+  channelId: string = 'budget',
+) {
+  const tokens = await getAdminManagerPushTokens();
+  await sendExpoPush(tokens, title, body, data, channelId);
 }
 
 // ─── Notificar a un usuario especifico ─────────────────────────────────────

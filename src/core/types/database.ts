@@ -25,6 +25,7 @@ export interface Profile {
   role: UserRole;
   phone: string | null;
   payment_alias: string | null;
+  push_token: string | null;
   is_active: boolean;
   has_completed_onboarding: boolean;
   last_login_at: string | null;
@@ -146,14 +147,16 @@ export interface CurrencyRate {
   created_at: string;
 }
 
-// ─── Alerta de presupuesto ──────────────────────────────────────────────────
+// ─── Alerta de balance ──────────────────────────────────────────────────────
+
+export type BalanceAlertType = 'below' | 'above';
 
 export interface BudgetAlert {
   id: string;
   category_id: string;
-  threshold_percentage: number;
+  alert_type: BalanceAlertType;
+  threshold_amount: number;
   is_active: boolean;
-  notify_roles: UserRole[];
   created_at: string;
 }
 

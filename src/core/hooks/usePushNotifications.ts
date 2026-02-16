@@ -36,6 +36,7 @@ export function usePushNotifications() {
           router.push('/approvals');
           break;
         case 'budget_alert':
+        case 'balance_alert':
           router.push('/budget-alerts');
           break;
         default:

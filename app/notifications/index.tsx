@@ -57,7 +57,8 @@ function getRelativeTime(dateString: string): string {
 function getNotificationIcon(type: string): keyof typeof MaterialCommunityIcons.glyphMap {
   switch (type) {
     case 'budget_alert':
-      return 'alert-circle';
+    case 'balance_alert':
+      return 'bell-ring-outline';
     case 'approval':
       return 'clipboard-check';
     case 'approval_approved':
@@ -78,6 +79,7 @@ function getNotificationIcon(type: string): keyof typeof MaterialCommunityIcons.
 function getNotificationIconColor(type: string, colors: ReturnType<typeof useAppTheme>['colors']): string {
   switch (type) {
     case 'budget_alert':
+    case 'balance_alert':
       return colors.warning;
     case 'approval':
       return colors.info;
@@ -102,6 +104,7 @@ function getNotificationRoute(notification: Notification): string | null {
 
   switch (type) {
     case 'budget_alert':
+    case 'balance_alert':
       return '/budget-alerts';
     case 'approval':
       return '/approvals';

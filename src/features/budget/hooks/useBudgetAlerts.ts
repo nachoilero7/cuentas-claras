@@ -6,6 +6,7 @@ import {
   checkAllBudgets,
 } from '../services/budgetAlertService';
 import type { BudgetAlertWithCategory, BudgetStatus } from '../services/budgetAlertService';
+import type { BalanceAlertType } from '@/src/core/types/database';
 
 // ─── Obtener todas las alertas de presupuesto con datos de categoria ────────
 
@@ -20,13 +21,18 @@ export function useBudgetAlerts() {
   });
 }
 
-// ─── Crear o actualizar una alerta de presupuesto ──────────────────────────
+// ─── Crear o actualizar una alerta de balance ───────────────────────────────
 
 export function useUpsertBudgetAlert() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Parameters<typeof upsertBudgetAlert>[0]) => {
+    mutationFn: async (data: {
+      category_id: string;
+      alert_type: BalanceAlertType;
+      threshold_amount: number;
+      is_active: boolean;
+    }) => {
       const { data: alert, error } = await upsertBudgetAlert(data);
       if (error) throw error;
       return alert;
@@ -58,11 +64,11 @@ export function useDeleteBudgetAlert() {
 
 // ─── Verificar el estado de todos los presupuestos con alertas activas ─────
 
-export function useBudgetStatus() {
+export function useBudgetStatus(seasonId?: string) {
   return useQuery<BudgetStatus[]>({
-    queryKey: ['budget-status'],
+    queryKey: ['budget-status', seasonId ?? 'all'],
     queryFn: async () => {
-      const { data, error } = await checkAllBudgets();
+      const { data, error } = await checkAllBudgets(seasonId);
       if (error) throw error;
       return data;
     },

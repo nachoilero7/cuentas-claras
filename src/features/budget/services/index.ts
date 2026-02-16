@@ -1,9 +1,8 @@
 export {
   getBudgetAlerts,
-  getBudgetAlertByCategory,
+  getBudgetAlertsByCategory,
   upsertBudgetAlert,
   deleteBudgetAlert,
-  checkBudgetStatus,
   checkAllBudgets,
 } from './budgetAlertService';
 
@@ -15,6 +14,6 @@ export {
   markAsRead,
   markAllAsRead,
   createNotification,
-  createBudgetAlertNotification,
+  createBalanceAlertNotification,
   deleteNotification,
 } from './notificationService';

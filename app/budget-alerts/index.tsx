@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,13 +7,17 @@ import {
   RefreshControl,
   Alert,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { Text, Switch } from 'react-native-paper';
+import { Text, Switch, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useCategories } from '@/src/features/categories/hooks/useCategories';
+import { useCategoryBalances } from '@/src/features/dashboard/hooks/useDashboard';
 import {
   useBudgetAlerts,
   useUpsertBudgetAlert,
@@ -27,76 +31,26 @@ import { formatCurrency } from '@/src/core/utils/currency';
 import { hapticWarning } from '@/src/shared/lib/haptics';
 import { spacing, borderRadius } from '@/src/shared/theme';
 import type { BudgetAlertWithCategory } from '@/src/features/budget/services/budgetAlertService';
-import type { BudgetStatus } from '@/src/features/budget/services/budgetAlertService';
+import type { BalanceAlertType } from '@/src/core/types/database';
 
-// ── Colores de progreso ─────────────────────────────────────────────────────
+// ── Labels de tipo de alerta ────────────────────────────────────────────────
 
-function getProgressColor(percentageUsed: number, threshold: number, colors: { error: string; warning: string; success: string }): string {
-  if (percentageUsed >= threshold) return colors.error;
-  if (percentageUsed >= 50) return colors.warning;
-  return colors.success;
-}
-
-// ── Componente de barra de progreso ─────────────────────────────────────────
-
-function ProgressBar({
-  percentage,
-  threshold,
-  color,
-  trackColor,
-  markerColor,
-}: {
-  percentage: number;
-  threshold: number;
-  color: string;
-  trackColor: string;
-  markerColor: string;
-}) {
-  const clampedPercentage = Math.min(percentage, 100);
-  const clampedThreshold = Math.min(threshold, 100);
-
-  return (
-    <View style={[progressStyles.track, { backgroundColor: trackColor }]}>
-      <View
-        style={[
-          progressStyles.fill,
-          {
-            backgroundColor: color,
-            width: `${clampedPercentage}%`,
-          },
-        ]}
-      />
-      {/* Marcador del umbral */}
-      <View
-        style={[
-          progressStyles.thresholdMarker,
-          { left: `${clampedThreshold}%`, backgroundColor: markerColor },
-        ]}
-      />
-    </View>
-  );
-}
-
-const progressStyles = StyleSheet.create({
-  track: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'visible',
-    position: 'relative',
+const ALERT_TYPE_CONFIG: Record<BalanceAlertType, {
+  label: string;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  description: string;
+}> = {
+  below: {
+    label: 'Balance bajo',
+    icon: 'arrow-down-circle-outline',
+    description: 'Alertar cuando el balance baje de',
   },
-  fill: {
-    height: '100%',
-    borderRadius: 4,
+  above: {
+    label: 'Balance alto',
+    icon: 'arrow-up-circle-outline',
+    description: 'Alertar cuando el balance alcance o supere',
   },
-  thresholdMarker: {
-    position: 'absolute',
-    top: -2,
-    width: 2,
-    height: 12,
-    borderRadius: 1,
-    marginLeft: -1,
-  },
-});
+};
 
 // ── Componente principal ────────────────────────────────────────────────────
 
@@ -119,130 +73,111 @@ export default function BudgetAlertsScreen() {
     isRefetching: isStatusRefetching,
   } = useBudgetStatus();
 
+  const { data: categories } = useCategories();
+  const { data: categoryBalances } = useCategoryBalances();
+
   const upsertMutation = useUpsertBudgetAlert();
   const deleteMutation = useDeleteBudgetAlert();
 
   const role = profile?.role ?? 'viewer';
   const isAdmin = role === 'admin';
 
-  // ── Mapa de estados de presupuesto por categoria ──────────────────────────
-  // NOTA: todos los hooks deben ir ANTES de los early returns (Rules of Hooks)
+  // ── Estado del formulario de nueva alerta ─────────────────────────────────
+
+  const [showForm, setShowForm] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedAlertType, setSelectedAlertType] = useState<BalanceAlertType>('below');
+  const [thresholdInput, setThresholdInput] = useState('');
+
+  // ── Mapa de estados por alert_id ──────────────────────────────────────────
 
   const statusMap = useMemo(() => {
-    const map = new Map<string, BudgetStatus>();
-    budgetStatuses?.forEach((s) => map.set(s.category_id, s));
+    const map = new Map<string, typeof budgetStatuses extends (infer T)[] | undefined ? T : never>();
+    budgetStatuses?.forEach((s) => map.set(s.alert_id, s));
     return map;
   }, [budgetStatuses]);
 
-  const activeAlerts = useMemo(() => {
-    return (alerts ?? []).filter((a) => a.is_active);
-  }, [alerts]);
+  // ── Mapa de balances por category_id ──────────────────────────────────────
 
-  // Cabecera de la lista (debe estar antes de los early returns - Rules of Hooks)
-  const ListHeaderComponent = useMemo(() => {
-    if (activeAlerts.length === 0) return null;
+  const balanceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    categoryBalances?.forEach((b) => map.set(b.category_id, b.balance_ars));
+    return map;
+  }, [categoryBalances]);
 
-    return (
-      <View>
-        {/* Seccion de estados de presupuesto */}
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="chart-bar"
-            size={20}
-            color={colors.primary}
-          />
-          <Text
-            variant="titleMedium"
-            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
-          >
-            Estado de presupuestos
-          </Text>
-        </View>
+  // ── Categorias disponibles para nueva alerta ──────────────────────────────
 
-        {activeAlerts.map((alert) => {
-          const status = statusMap.get(alert.category_id);
-          if (!status) return null;
-
-          const progressColor = getProgressColor(status.percentage_used, status.threshold_percentage, colors);
-          const iconName = (alert.category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'tag-outline';
-
-          return (
-            <Card
-              key={`status-${alert.id}`}
-              variant="elevated"
-              padding="md"
-              style={styles.statusCard}
-            >
-              <View style={styles.statusHeader}>
-                <View style={[styles.statusIconContainer, { backgroundColor: alert.category?.color ? `${alert.category.color}20` : colors.primaryContainer }]}>
-                  <MaterialCommunityIcons
-                    name={iconName}
-                    size={20}
-                    color={alert.category?.color ?? colors.primary}
-                  />
-                </View>
-                <View style={styles.statusHeaderText}>
-                  <Text
-                    variant="titleSmall"
-                    style={{ color: colors.text, fontWeight: '700' }}
-                    numberOfLines={1}
-                  >
-                    {status.category_name}
-                  </Text>
-                  <Text
-                    variant="labelSmall"
-                    style={{ color: progressColor, fontWeight: '600' }}
-                  >
-                    {Math.round(status.percentage_used)}% usado
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ marginTop: spacing.sm }}>
-                <ProgressBar
-                  percentage={status.percentage_used}
-                  threshold={status.threshold_percentage}
-                  color={progressColor}
-                  trackColor={colors.outlineVariant}
-                  markerColor={colors.text}
-                />
-              </View>
-
-              <View style={styles.statusFooter}>
-                <Text
-                  variant="bodySmall"
-                  style={{ color: colors.textSecondary }}
-                >
-                  {formatCurrency(status.current_spending)} / {formatCurrency(status.budget_limit)}
-                </Text>
-                <Text
-                  variant="labelSmall"
-                  style={{ color: colors.textTertiary }}
-                >
-                  Umbral: {status.threshold_percentage}%
-                </Text>
-              </View>
-            </Card>
-          );
-        })}
-
-        {/* Separador */}
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons
-            name="cog-outline"
-            size={20}
-            color={colors.primary}
-          />
-          <Text
-            variant="titleMedium"
-            style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
-          >
-            Configuracion de alertas
-          </Text>
-        </View>
-      </View>
+  const availableCategories = useMemo(() => {
+    if (!categories) return [];
+    const existingPairs = new Set(
+      (alerts ?? []).map((a) => `${a.category_id}:${a.alert_type}`),
     );
-  }, [activeAlerts, statusMap, colors]);
+    return categories.filter((c) => {
+      // Mostrar categoria si al menos un tipo de alerta no esta configurado
+      return (
+        !existingPairs.has(`${c.id}:below`) ||
+        !existingPairs.has(`${c.id}:above`)
+      );
+    });
+  }, [categories, alerts]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleToggleAlert = useCallback((alert: BudgetAlertWithCategory) => {
+    upsertMutation.mutate({
+      category_id: alert.category_id,
+      alert_type: alert.alert_type,
+      threshold_amount: alert.threshold_amount,
+      is_active: !alert.is_active,
+    });
+  }, [upsertMutation]);
+
+  const handleDeleteAlert = useCallback((alert: BudgetAlertWithCategory) => {
+    hapticWarning();
+    Alert.alert(
+      'Eliminar alerta',
+      `Deseas eliminar la alerta "${ALERT_TYPE_CONFIG[alert.alert_type].label}" de "${alert.category?.name ?? 'esta categoria'}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => deleteMutation.mutate(alert.id),
+        },
+      ],
+    );
+  }, [deleteMutation]);
+
+  const handleCreateAlert = useCallback(() => {
+    if (!selectedCategoryId) return;
+
+    const amount = parseFloat(thresholdInput.replace(/[^\d.]/g, ''));
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Monto invalido', 'Ingresa un monto mayor a cero.');
+      return;
+    }
+
+    upsertMutation.mutate(
+      {
+        category_id: selectedCategoryId,
+        alert_type: selectedAlertType,
+        threshold_amount: amount,
+        is_active: true,
+      },
+      {
+        onSuccess: () => {
+          setShowForm(false);
+          setSelectedCategoryId(null);
+          setThresholdInput('');
+        },
+      },
+    );
+  }, [selectedCategoryId, selectedAlertType, thresholdInput, upsertMutation]);
+
+  const handleRefresh = useCallback(() => {
+    refetchAlerts();
+    refetchStatus();
+  }, [refetchAlerts, refetchStatus]);
 
   // ── Guard: solo admin puede acceder ──────────────────────────────────────
 
@@ -264,7 +199,7 @@ export default function BudgetAlertsScreen() {
           variant="bodyMedium"
           style={{ color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }}
         >
-          No tienes permisos para gestionar las alertas de presupuesto.
+          No tienes permisos para gestionar las alertas de balance.
         </Text>
         <View style={{ marginTop: spacing.lg }}>
           <Button variant="primary" size="md" onPress={() => router.back()}>
@@ -324,59 +259,185 @@ export default function BudgetAlertsScreen() {
     );
   }
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Renderizar formulario de nueva alerta ─────────────────────────────────
 
-  const handleToggleAlert = (alert: BudgetAlertWithCategory) => {
-    upsertMutation.mutate({
-      category_id: alert.category_id,
-      threshold_percentage: alert.threshold_percentage,
-      is_active: !alert.is_active,
-    });
-  };
+  const renderForm = () => {
+    if (!showForm) return null;
 
-  const handleThresholdStep = (alert: BudgetAlertWithCategory, direction: 'up' | 'down') => {
-    const step = 5;
-    const current = alert.threshold_percentage;
-    const newValue = direction === 'up'
-      ? Math.min(current + step, 100)
-      : Math.max(current - step, 10);
-    if (newValue !== current) {
-      upsertMutation.mutate({
-        category_id: alert.category_id,
-        threshold_percentage: newValue,
-        is_active: alert.is_active,
-      });
-    }
-  };
+    return (
+      <Card variant="elevated" padding="md" style={styles.formCard}>
+        <Text
+          variant="titleSmall"
+          style={{ color: colors.text, fontWeight: '700', marginBottom: spacing.smd }}
+        >
+          Nueva alerta de balance
+        </Text>
 
-  const handleDeleteAlert = (alert: BudgetAlertWithCategory) => {
-    hapticWarning();
-    Alert.alert(
-      'Eliminar alerta',
-      `Deseas eliminar la alerta de "${alert.category?.name ?? 'esta categoria'}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            deleteMutation.mutate(alert.id);
-          },
-        },
-      ],
+        {/* Selector de categoria */}
+        <Text
+          variant="labelMedium"
+          style={{ color: colors.textSecondary, marginBottom: spacing.xs }}
+        >
+          Rubro
+        </Text>
+        <View style={styles.categoryPicker}>
+          {availableCategories.length === 0 ? (
+            <Text variant="bodySmall" style={{ color: colors.textTertiary, padding: spacing.sm }}>
+              Todos los rubros ya tienen alertas de ambos tipos.
+            </Text>
+          ) : (
+            availableCategories.map((cat) => {
+              const isSelected = selectedCategoryId === cat.id;
+              return (
+                <Pressable
+                  key={cat.id}
+                  style={[
+                    styles.categoryChip,
+                    {
+                      backgroundColor: isSelected ? colors.primaryContainer : colors.surfaceVariant,
+                      borderColor: isSelected ? colors.primary : colors.outline,
+                    },
+                  ]}
+                  onPress={() => setSelectedCategoryId(cat.id)}
+                >
+                  {cat.icon && (
+                    <MaterialCommunityIcons
+                      name={cat.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                      size={16}
+                      color={isSelected ? colors.primary : cat.color ?? colors.textSecondary}
+                    />
+                  )}
+                  <Text
+                    variant="labelMedium"
+                    style={{
+                      color: isSelected ? colors.primary : colors.text,
+                      fontWeight: isSelected ? '600' : '400',
+                      marginLeft: cat.icon ? spacing.xs : 0,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {cat.name}
+                  </Text>
+                  {selectedCategoryId === cat.id && (
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: colors.textTertiary, marginLeft: spacing.xs }}
+                    >
+                      (Balance: {formatCurrency(balanceMap.get(cat.id) ?? 0)})
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })
+          )}
+        </View>
+
+        {/* Selector de tipo de alerta */}
+        <Text
+          variant="labelMedium"
+          style={{ color: colors.textSecondary, marginTop: spacing.smd, marginBottom: spacing.xs }}
+        >
+          Tipo de alerta
+        </Text>
+        <View style={styles.alertTypeRow}>
+          {(['below', 'above'] as BalanceAlertType[]).map((type) => {
+            const config = ALERT_TYPE_CONFIG[type];
+            const isSelected = selectedAlertType === type;
+            // Check if this type is already configured for selected category
+            const alreadyExists = selectedCategoryId
+              ? (alerts ?? []).some((a) => a.category_id === selectedCategoryId && a.alert_type === type)
+              : false;
+
+            return (
+              <Pressable
+                key={type}
+                style={[
+                  styles.alertTypeChip,
+                  {
+                    backgroundColor: isSelected ? colors.primaryContainer : colors.surfaceVariant,
+                    borderColor: isSelected ? colors.primary : colors.outline,
+                    opacity: alreadyExists ? 0.5 : 1,
+                  },
+                ]}
+                onPress={() => !alreadyExists && setSelectedAlertType(type)}
+                disabled={alreadyExists}
+              >
+                <MaterialCommunityIcons
+                  name={config.icon}
+                  size={20}
+                  color={isSelected ? colors.primary : colors.textSecondary}
+                />
+                <Text
+                  variant="labelMedium"
+                  style={{
+                    color: isSelected ? colors.primary : colors.text,
+                    fontWeight: isSelected ? '600' : '400',
+                    marginLeft: spacing.xs,
+                  }}
+                >
+                  {config.label}
+                </Text>
+                {alreadyExists && (
+                  <Text variant="labelSmall" style={{ color: colors.textTertiary, marginLeft: spacing.xs }}>
+                    (ya existe)
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Monto umbral */}
+        <Text
+          variant="labelMedium"
+          style={{ color: colors.textSecondary, marginTop: spacing.smd, marginBottom: spacing.xs }}
+        >
+          {ALERT_TYPE_CONFIG[selectedAlertType].description}
+        </Text>
+        <TextInput
+          mode="outlined"
+          value={thresholdInput}
+          onChangeText={setThresholdInput}
+          placeholder="Ej: 50000"
+          keyboardType="numeric"
+          left={<TextInput.Affix text="$" />}
+          style={{ backgroundColor: colors.surface }}
+        />
+
+        {/* Botones */}
+        <View style={styles.formButtons}>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => {
+              setShowForm(false);
+              setSelectedCategoryId(null);
+              setThresholdInput('');
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onPress={handleCreateAlert}
+            loading={upsertMutation.isPending}
+            disabled={!selectedCategoryId || !thresholdInput}
+          >
+            Crear alerta
+          </Button>
+        </View>
+      </Card>
     );
   };
 
-  const handleRefresh = () => {
-    refetchAlerts();
-    refetchStatus();
-  };
-
-  // ── Renderizar cada alerta configurable ───────────────────────────────────
+  // ── Renderizar cada alerta configurada ───────────────────────────────────
 
   const renderAlertItem = ({ item }: { item: BudgetAlertWithCategory }) => {
     const iconName = (item.category?.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'tag-outline';
-    const budgetLimit = item.category?.budget_limit_ars;
+    const config = ALERT_TYPE_CONFIG[item.alert_type];
+    const status = statusMap.get(item.id);
+    const currentBalance = status?.current_balance ?? balanceMap.get(item.category_id) ?? 0;
 
     return (
       <Card variant="outlined" padding="md" style={styles.alertCard}>
@@ -397,14 +458,19 @@ export default function BudgetAlertsScreen() {
               >
                 {item.category?.name ?? 'Categoria desconocida'}
               </Text>
-              {budgetLimit != null && (
+              <View style={styles.alertTypeBadge}>
+                <MaterialCommunityIcons
+                  name={config.icon}
+                  size={14}
+                  color={item.alert_type === 'below' ? colors.error : colors.success}
+                />
                 <Text
-                  variant="bodySmall"
-                  style={{ color: colors.textSecondary }}
+                  variant="labelSmall"
+                  style={{ color: colors.textSecondary, marginLeft: 4 }}
                 >
-                  Limite: {formatCurrency(budgetLimit)}
+                  {config.label}
                 </Text>
-              )}
+              </View>
             </View>
           </View>
           <Switch
@@ -414,56 +480,65 @@ export default function BudgetAlertsScreen() {
           />
         </View>
 
-        {/* Control de umbral con stepper */}
+        {/* Informacion de umbral y balance actual */}
         <View style={[styles.thresholdSection, { borderTopColor: colors.outlineVariant }]}>
-          <Text
-            variant="bodySmall"
-            style={{ color: colors.textSecondary, marginBottom: spacing.sm }}
-          >
-            Umbral de alerta
-          </Text>
-          <View style={styles.stepperRow}>
-            <Pressable
-              style={[styles.stepperButton, { backgroundColor: colors.surfaceVariant, borderColor: colors.outline }]}
-              onPress={() => handleThresholdStep(item, 'down')}
-              disabled={item.threshold_percentage <= 10}
-            >
-              <MaterialCommunityIcons
-                name="minus"
-                size={20}
-                color={item.threshold_percentage <= 10 ? colors.textDisabled : colors.text}
-              />
-            </Pressable>
-
-            <View style={[styles.stepperValueContainer, { backgroundColor: colors.primaryContainer }]}>
+          <View style={styles.thresholdRow}>
+            <View style={styles.thresholdItem}>
+              <Text variant="labelSmall" style={{ color: colors.textTertiary }}>
+                Umbral
+              </Text>
               <Text
-                variant="titleMedium"
-                style={{ color: colors.primary, fontWeight: '700' }}
+                variant="titleSmall"
+                style={{ color: colors.text, fontWeight: '700' }}
               >
-                {item.threshold_percentage}%
+                {formatCurrency(item.threshold_amount)}
               </Text>
             </View>
+            <View style={styles.thresholdItem}>
+              <Text variant="labelSmall" style={{ color: colors.textTertiary }}>
+                Balance actual
+              </Text>
+              <Text
+                variant="titleSmall"
+                style={{
+                  color: status?.is_triggered ? colors.error : colors.success,
+                  fontWeight: '700',
+                }}
+              >
+                {formatCurrency(currentBalance)}
+              </Text>
+            </View>
+          </View>
 
-            <Pressable
-              style={[styles.stepperButton, { backgroundColor: colors.surfaceVariant, borderColor: colors.outline }]}
-              onPress={() => handleThresholdStep(item, 'up')}
-              disabled={item.threshold_percentage >= 100}
-            >
+          {/* Indicador de estado */}
+          {status && (
+            <View style={[
+              styles.statusBadge,
+              {
+                backgroundColor: status.is_triggered
+                  ? `${colors.error}15`
+                  : `${colors.success}15`,
+              },
+            ]}>
               <MaterialCommunityIcons
-                name="plus"
-                size={20}
-                color={item.threshold_percentage >= 100 ? colors.textDisabled : colors.text}
+                name={status.is_triggered ? 'bell-ring-outline' : 'bell-check-outline'}
+                size={16}
+                color={status.is_triggered ? colors.error : colors.success}
               />
-            </Pressable>
-          </View>
-          <View style={styles.stepperLabels}>
-            <Text variant="labelSmall" style={{ color: colors.textTertiary }}>
-              Min: 10%
-            </Text>
-            <Text variant="labelSmall" style={{ color: colors.textTertiary }}>
-              Max: 100%
-            </Text>
-          </View>
+              <Text
+                variant="labelSmall"
+                style={{
+                  color: status.is_triggered ? colors.error : colors.success,
+                  marginLeft: spacing.xs,
+                  fontWeight: '600',
+                }}
+              >
+                {status.is_triggered
+                  ? (item.alert_type === 'below' ? 'Balance por debajo del umbral' : 'Balance alcanzo el umbral')
+                  : 'Sin alertar'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Boton de eliminar */}
@@ -490,19 +565,56 @@ export default function BudgetAlertsScreen() {
   // ── Pantalla principal ────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <FlatList
         data={alerts ?? []}
         keyExtractor={(item) => item.id}
         renderItem={renderAlertItem}
         contentContainerStyle={[
           styles.listContent,
-          (!alerts || alerts.length === 0) && styles.emptyListContent,
+          (!alerts || alerts.length === 0) && !showForm && styles.emptyListContent,
         ]}
         ListHeaderComponent={
-          alerts && alerts.length > 0
-            ? ListHeaderComponent
-            : undefined
+          <View>
+            {/* Boton para crear nueva alerta */}
+            {!showForm && (
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primaryContainer }]}
+                onPress={() => setShowForm(true)}
+              >
+                <MaterialCommunityIcons name="plus" size={20} color={colors.primary} />
+                <Text
+                  variant="labelLarge"
+                  style={{ color: colors.primary, marginLeft: spacing.sm, fontWeight: '600' }}
+                >
+                  Nueva alerta de balance
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Formulario */}
+            {renderForm()}
+
+            {/* Titulo de lista */}
+            {(alerts ?? []).length > 0 && (
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons
+                  name="bell-outline"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text
+                  variant="titleMedium"
+                  style={{ color: colors.text, marginLeft: spacing.sm, fontWeight: '700' }}
+                >
+                  Alertas configuradas
+                </Text>
+              </View>
+            )}
+          </View>
         }
         refreshControl={
           <RefreshControl
@@ -513,15 +625,17 @@ export default function BudgetAlertsScreen() {
           />
         }
         ListEmptyComponent={
-          <EmptyState
-            icon="bell-alert-outline"
-            title="Sin alertas configuradas"
-            description="No hay alertas de presupuesto configuradas. Las alertas se crean automaticamente al establecer limites de presupuesto en las categorias."
-          />
+          showForm ? null : (
+            <EmptyState
+              icon="bell-alert-outline"
+              title="Sin alertas configuradas"
+              description="Crea alertas para recibir notificaciones cuando el balance de un rubro suba o baje de un monto determinado."
+            />
+          )
         }
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -551,33 +665,56 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
 
-  // Status cards
-  statusCard: {
-    marginBottom: spacing.smd,
-  },
-  statusHeader: {
+  // Add button
+  addButton: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statusHeaderText: {
-    flex: 1,
-    marginLeft: spacing.smd,
-  },
-  statusFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.sm,
+    paddingVertical: spacing.smd,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 
-  // Alert config cards
+  // Form
+  formCard: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  categoryPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  alertTypeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  alertTypeChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.smd,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  formButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+
+  // Alert cards
   alertCard: {
     marginBottom: spacing.smd,
   },
@@ -603,37 +740,30 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: spacing.smd,
   },
+  alertTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   thresholdSection: {
     marginTop: spacing.smd,
     paddingTop: spacing.smd,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  stepperButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  stepperValueContainer: {
-    minWidth: 72,
-    height: 40,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-  },
-  stepperLabels: {
+  thresholdRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.xs,
+  },
+  thresholdItem: {
+    gap: 2,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.smd,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.smd,
   },
   deleteRow: {
     flexDirection: 'row',

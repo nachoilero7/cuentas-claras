@@ -7,6 +7,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,7 +27,9 @@ import {
   useDeleteCategory,
 } from '@/src/features/categories/hooks/useCategories';
 import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
+import { useCategoryBalances } from '@/src/features/dashboard/hooks/useDashboard';
 import { suggestIcon, pickUnusedColor } from '@/src/features/categories/utils/categoryDefaults';
+import { formatCurrency } from '@/src/core/utils/currency';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
 import { showSnackbar } from '@/src/shared/lib/snackbar';
@@ -43,14 +46,6 @@ const categorySchema = z.object({
   description: z
     .string()
     .max(500, 'La descripcion no puede exceder 500 caracteres')
-    .optional()
-    .or(z.literal('')),
-  budget_limit_ars: z
-    .string()
-    .optional()
-    .or(z.literal('')),
-  budget_limit_usd: z
-    .string()
     .optional()
     .or(z.literal('')),
 });
@@ -84,9 +79,16 @@ export default function CategoryFormScreen() {
   const { data: category, isLoading: isCategoryLoading, error: categoryError } = useCategory(
     isCreateMode ? '' : id!
   );
+  const { data: categoryBalances } = useCategoryBalances(currentSeason?.id);
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
+
+  // Balance de esta categoria (solo en edicion)
+  const balance = useMemo(() => {
+    if (isCreateMode || !categoryBalances || !id) return null;
+    return categoryBalances.find((b) => b.category_id === id) ?? null;
+  }, [isCreateMode, categoryBalances, id]);
 
   // Colores en uso por categorias existentes
   const usedColors = useMemo(
@@ -99,8 +101,6 @@ export default function CategoryFormScreen() {
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
-  const [budgetArs, setBudgetArs] = useState('');
-  const [budgetUsd, setBudgetUsd] = useState('');
 
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -114,16 +114,12 @@ export default function CategoryFormScreen() {
   const hasUnsavedChanges = useCallback((): boolean => {
     if (savedRef.current) return false;
     if (isCreateMode) {
-      // Solo considerar campos editables por el usuario (nombre, descripcion, presupuestos)
-      return name.trim() !== '' || description.trim() !== '' ||
-        budgetArs.trim() !== '' || budgetUsd.trim() !== '';
+      return name.trim() !== '' || description.trim() !== '';
     }
     if (!category) return false;
     return name !== (category.name ?? '') ||
-      description !== (category.description ?? '') ||
-      budgetArs !== (category.budget_limit_ars !== null ? String(category.budget_limit_ars) : '') ||
-      budgetUsd !== (category.budget_limit_usd !== null ? String(category.budget_limit_usd) : '');
-  }, [isCreateMode, category, name, description, budgetArs, budgetUsd]);
+      description !== (category.description ?? '');
+  }, [isCreateMode, category, name, description]);
 
   // Advertir al usuario si navega con cambios sin guardar
   useEffect(() => {
@@ -165,28 +161,13 @@ export default function CategoryFormScreen() {
       setDescription(category.description ?? '');
       setIcon(category.icon ?? '');
       setColor(category.color ?? '');
-      setBudgetArs(
-        category.budget_limit_ars !== null
-          ? String(category.budget_limit_ars)
-          : ''
-      );
-      setBudgetUsd(
-        category.budget_limit_usd !== null
-          ? String(category.budget_limit_usd)
-          : ''
-      );
     }
   }, [isCreateMode, category]);
 
   // ── Validacion ──────────────────────────────────────────────────────────────
 
   const validate = useCallback((): boolean => {
-    const result = categorySchema.safeParse({
-      name,
-      description,
-      budget_limit_ars: budgetArs,
-      budget_limit_usd: budgetUsd,
-    });
+    const result = categorySchema.safeParse({ name, description });
 
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -200,31 +181,9 @@ export default function CategoryFormScreen() {
       return false;
     }
 
-    // Validar montos numericos manualmente
-    const newErrors: Record<string, string> = {};
-
-    if (budgetArs.trim() !== '') {
-      const parsed = parseFloat(budgetArs);
-      if (isNaN(parsed) || parsed < 0) {
-        newErrors.budget_limit_ars = 'Debe ser un numero positivo';
-      }
-    }
-
-    if (budgetUsd.trim() !== '') {
-      const parsed = parseFloat(budgetUsd);
-      if (isNaN(parsed) || parsed < 0) {
-        newErrors.budget_limit_usd = 'Debe ser un numero positivo';
-      }
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return false;
-    }
-
     setErrors({});
     return true;
-  }, [name, description, budgetArs, budgetUsd]);
+  }, [name, description]);
 
   // ── Enviar formulario ───────────────────────────────────────────────────────
 
@@ -236,8 +195,6 @@ export default function CategoryFormScreen() {
       description: description.trim() || null,
       icon: icon.trim() || null,
       color: color.trim() || null,
-      budget_limit_ars: budgetArs.trim() ? parseFloat(budgetArs) : null,
-      budget_limit_usd: budgetUsd.trim() ? parseFloat(budgetUsd) : null,
     };
 
     try {
@@ -270,8 +227,6 @@ export default function CategoryFormScreen() {
     description,
     icon,
     color,
-    budgetArs,
-    budgetUsd,
     isCreateMode,
     id,
     createCategory,
@@ -345,6 +300,9 @@ export default function CategoryFormScreen() {
     );
   }
 
+  // Color del balance
+  const balanceColor = (balance?.balance_ars ?? 0) >= 0 ? colors.income : colors.expense;
+
   // ── Formulario ────────────────────────────────────────────────────────────
 
   return (
@@ -367,6 +325,84 @@ export default function CategoryFormScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Balance del rubro (solo edicion) ───────────────────────── */}
+          {!isCreateMode && balance && (
+            <View style={[styles.balanceCard, { backgroundColor: colors.surface }]}>
+              <View style={styles.balanceHeader}>
+                <MaterialCommunityIcons name="wallet-outline" size={20} color={colors.primary} />
+                <Text variant="titleSmall" style={{ color: colors.text, fontWeight: '600' }}>
+                  Balance del rubro
+                </Text>
+              </View>
+
+              <Text
+                variant="headlineMedium"
+                style={[styles.balanceAmount, { color: balanceColor }]}
+              >
+                {formatCurrency(balance.balance_ars)}
+              </Text>
+
+              <View style={styles.balanceDetails}>
+                <View style={styles.balanceDetailItem}>
+                  <MaterialCommunityIcons name="trending-up" size={14} color={colors.income} />
+                  <Text variant="bodySmall" style={{ color: colors.textSecondary, flex: 1 }}>
+                    Ingresos
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: colors.income, fontWeight: '600' }}>
+                    +{formatCurrency(balance.total_income_ars)}
+                  </Text>
+                </View>
+                {balance.net_transfers_ars !== 0 && (
+                  <View style={styles.balanceDetailItem}>
+                    <MaterialCommunityIcons
+                      name="swap-horizontal"
+                      size={14}
+                      color={balance.net_transfers_ars >= 0 ? colors.income : colors.expense}
+                    />
+                    <Text variant="bodySmall" style={{ color: colors.textSecondary, flex: 1 }}>
+                      Transferencias
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        color: balance.net_transfers_ars >= 0 ? colors.income : colors.expense,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {balance.net_transfers_ars >= 0 ? '+' : ''}{formatCurrency(balance.net_transfers_ars)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.balanceDetailItem}>
+                  <MaterialCommunityIcons name="trending-down" size={14} color={colors.expense} />
+                  <Text variant="bodySmall" style={{ color: colors.textSecondary, flex: 1 }}>
+                    Egresos
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: colors.expense, fontWeight: '600' }}>
+                    -{formatCurrency(balance.total_expenses_ars)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.balanceDivider, { backgroundColor: colors.outlineVariant }]} />
+
+              <Pressable
+                style={styles.balanceAction}
+                onPress={() => router.push({
+                  pathname: '/(tabs)/transactions',
+                  params: { categoryId: id },
+                })}
+                accessibilityRole="button"
+                accessibilityLabel="Ver movimientos de este rubro"
+              >
+                <Text variant="labelMedium" style={{ color: colors.primary }}>
+                  Ver {balance.transaction_count} movimiento{balance.transaction_count !== 1 ? 's' : ''}
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={colors.primary} />
+              </Pressable>
+            </View>
+          )}
+
           {/* ── Tarjeta de formulario ──────────────────────────────────── */}
           <View style={[styles.form, { backgroundColor: colors.surface }]}>
             <Text
@@ -435,30 +471,6 @@ export default function CategoryFormScreen() {
               autoCapitalize="sentences"
             />
 
-            {/* Presupuesto ARS */}
-            <Input
-              label="Presupuesto ARS"
-              value={budgetArs}
-              onChangeText={setBudgetArs}
-              placeholder="Ej: 50000"
-              leftIcon="currency-usd"
-              error={errors.budget_limit_ars}
-              keyboardType="numeric"
-              helperText="Limite de presupuesto en pesos argentinos"
-            />
-
-            {/* Presupuesto USD */}
-            <Input
-              label="Presupuesto USD"
-              value={budgetUsd}
-              onChangeText={setBudgetUsd}
-              placeholder="Ej: 500"
-              leftIcon="currency-usd"
-              error={errors.budget_limit_usd}
-              keyboardType="numeric"
-              helperText="Limite de presupuesto en dolares"
-            />
-
             {/* Boton de enviar */}
             <View style={styles.submitSection}>
               <Button
@@ -515,7 +527,48 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
+    gap: spacing.md,
   },
+
+  // Balance del rubro
+  balanceCard: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    gap: spacing.smd,
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  balanceAmount: {
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  balanceDetails: {
+    gap: spacing.xs,
+  },
+  balanceDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  balanceDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+  balanceAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+
+  // Formulario
   form: {
     borderRadius: 16,
     padding: spacing.lg,
