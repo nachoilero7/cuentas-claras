@@ -32,5 +32,5 @@ DO $$ BEGIN
   ALTER TABLE budget_alerts
     ADD CONSTRAINT budget_alerts_category_type_key UNIQUE(category_id, alert_type);
 EXCEPTION
-  WHEN duplicate_object THEN NULL;
+  WHEN duplicate_table OR duplicate_object THEN NULL;
 END $$;

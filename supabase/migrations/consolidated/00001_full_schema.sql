@@ -6,8 +6,8 @@
 -- ║  aplicadas. Para bases existentes, usar los archivos individuales       ║
 -- ║  de migracion (00001 a 00012).                                          ║
 -- ║                                                                         ║
--- ║  Consolida migraciones: 00001 a 00012 + 20260212_recurring              ║
--- ║  Generado: 2026-02-13                                                   ║
+-- ║  Consolida migraciones: 00001 a 00016                                   ║
+-- ║  Generado: 2026-02-16                                                   ║
 -- ╚═══════════════════════════════════════════════════════════════════════════╝
 
 -- ============================================================
@@ -35,6 +35,7 @@ CREATE TYPE audit_action AS ENUM (
 CREATE TYPE season_status AS ENUM ('active', 'closed', 'planning');
 CREATE TYPE approval_status AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE payment_method AS ENUM ('cash', 'bank_transfer', 'digital_wallet', 'check');
+CREATE TYPE balance_alert_type AS ENUM ('below', 'above');
 
 -- ============================================================
 -- 3. TABLES
@@ -50,6 +51,7 @@ CREATE TABLE profiles (
   role user_role NOT NULL DEFAULT 'viewer',
   phone TEXT,
   payment_alias TEXT,
+  push_token TEXT,
   is_active BOOLEAN NOT NULL DEFAULT true,
   has_completed_onboarding BOOLEAN NOT NULL DEFAULT false,
   last_login_at TIMESTAMPTZ,
@@ -193,15 +195,15 @@ CREATE TABLE currency_rates (
   UNIQUE(from_currency, to_currency, effective_date)
 );
 
--- 3.9 BUDGET ALERTS
+-- 3.9 BUDGET ALERTS (balance-based: below/above threshold)
 CREATE TABLE budget_alerts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-  threshold_percentage INTEGER NOT NULL DEFAULT 80,
+  alert_type balance_alert_type NOT NULL DEFAULT 'below',
+  threshold_amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,
-  notify_roles user_role[] NOT NULL DEFAULT '{admin, manager}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(category_id)
+  UNIQUE(category_id, alert_type)
 );
 
 -- 3.10 NOTIFICATIONS
