@@ -18,6 +18,7 @@ function escapeIlike(str: string): string {
 export interface TransactionWithCategory extends Transaction {
   category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
   transfer_to_category: Pick<Category, 'id' | 'name' | 'color' | 'icon'> | null;
+  creator: { display_name: string | null } | null;
 }
 
 export type CreateTransactionData = {
@@ -51,11 +52,12 @@ export interface TransactionFilters {
   offset?: number;
 }
 
-// Select con join de categorias (origen y destino para transferencias)
+// Select con join de categorias (origen y destino) y perfil del creador
 const TRANSACTION_SELECT = `
   *,
   category:categories!category_id(id, name, color, icon),
-  transfer_to_category:categories!transfer_to_category_id(id, name, color, icon)
+  transfer_to_category:categories!transfer_to_category_id(id, name, color, icon),
+  creator:profiles!created_by(display_name)
 `;
 
 const DEFAULT_LIMIT = 50;

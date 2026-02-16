@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
+import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
 import {
   useTransaction,
   useCreateTransaction,
@@ -119,6 +120,7 @@ export default function TransactionFormScreen() {
   const { colors } = useAppTheme();
   const { data: profile } = useProfile();
   const { data: categories } = useCategories();
+  const { data: currentSeason } = useCurrentSeason();
 
   const isCreateMode = id === 'new';
   const role = profile?.role ?? 'viewer';
@@ -379,6 +381,7 @@ export default function TransactionFormScreen() {
       category_id: categoryId,
       transfer_to_category_id: type === 'transfer' ? transferToCategoryId : null,
       transaction_date: dateToISO(transactionDate),
+      season_id: currentSeason?.id ?? null,
     };
 
     try {

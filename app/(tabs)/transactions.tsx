@@ -550,6 +550,22 @@ const TransactionCard = memo(function TransactionCard({ transaction, colors, onP
             >
               {formatDate(transaction.transaction_date)}
             </Text>
+            {transaction.creator?.display_name && (
+              <View style={styles.creatorBadge}>
+                <MaterialCommunityIcons
+                  name="account-outline"
+                  size={11}
+                  color={colors.textTertiary}
+                />
+                <Text
+                  variant="labelSmall"
+                  style={{ color: colors.textTertiary, fontSize: 10 }}
+                  numberOfLines={1}
+                >
+                  {transaction.creator.display_name}
+                </Text>
+              </View>
+            )}
             {transaction.payment_method && (
               <View style={styles.paymentMethodBadge}>
                 <MaterialCommunityIcons
@@ -728,6 +744,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  creatorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    maxWidth: 100,
   },
   paymentMethodBadge: {
     flexDirection: 'row',
