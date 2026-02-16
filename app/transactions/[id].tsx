@@ -27,6 +27,7 @@ import {
   useDeleteTransaction,
 } from '@/src/features/transactions/hooks/useTransactions';
 import { useCreateApproval } from '@/src/features/approvals/hooks/useApprovals';
+import { useCategoryBalances } from '@/src/features/dashboard/hooks';
 import { sendPushToAdmins } from '@/src/core/services/pushNotifications';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { Input } from '@/src/shared/components/ui/Input';
@@ -138,6 +139,7 @@ export default function TransactionFormScreen() {
   const deleteTransaction = useDeleteTransaction();
   const createApproval = useCreateApproval();
   const { authenticate } = useBiometric();
+  const { data: categoryBalances } = useCategoryBalances();
 
   // Estado del formulario
   const [type, setType] = useState<TransactionType>('expense');
@@ -259,6 +261,12 @@ export default function TransactionFormScreen() {
     return categories.filter((c) => c.is_active);
   }, [categories]);
 
+  // Balance del rubro seleccionado (para validacion de fondos)
+  const selectedCategoryBalance = useMemo(() => {
+    if (!categoryId || !categoryBalances) return null;
+    return categoryBalances.find((b) => b.category_id === categoryId) ?? null;
+  }, [categoryId, categoryBalances]);
+
   // ── Validacion ────────────────────────────────────────────────────────────
 
   const validate = useCallback((): boolean => {
@@ -313,6 +321,27 @@ export default function TransactionFormScreen() {
       }
     }
 
+    // Validar fondos disponibles para egresos y transferencias
+    if ((type === 'expense' || type === 'transfer') && selectedCategoryBalance) {
+      const parsedAmt = parseFloat(amount.replace(',', '.'));
+      const parsedRate = exchangeRate.trim()
+        ? parseFloat(exchangeRate.replace(',', '.'))
+        : null;
+      const amountInArs = currency === 'USD' && parsedRate
+        ? parsedAmt * parsedRate
+        : parsedAmt;
+
+      // En modo edicion, sumar el monto original ya que esta descontado del balance
+      let availableBalance = selectedCategoryBalance.balance_ars;
+      if (!isCreateMode && transaction && transaction.category_id === categoryId) {
+        availableBalance += (transaction.amount_in_ars ?? 0);
+      }
+
+      if (amountInArs > availableBalance) {
+        newErrors.amount = `Fondos insuficientes. Disponible: ${formatCurrency(availableBalance, 'ARS')}`;
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return false;
@@ -320,7 +349,7 @@ export default function TransactionFormScreen() {
 
     setErrors({});
     return true;
-  }, [type, amount, currency, exchangeRate, description, notes, categoryId, transferToCategoryId, transactionDate]);
+  }, [type, amount, currency, exchangeRate, description, notes, categoryId, transferToCategoryId, transactionDate, selectedCategoryBalance, isCreateMode, transaction]);
 
   // ── Enviar formulario ─────────────────────────────────────────────────────
 
@@ -832,6 +861,22 @@ export default function TransactionFormScreen() {
                   {errors.category_id}
                 </Text>
               ) : null}
+              {/* Mostrar balance disponible del rubro seleccionado */}
+              {selectedCategoryBalance && (type === 'expense' || type === 'transfer') && (
+                <View style={[styles.balanceHint, { backgroundColor: selectedCategoryBalance.balance_ars > 0 ? colors.income + '12' : colors.error + '12' }]}>
+                  <MaterialCommunityIcons
+                    name="wallet-outline"
+                    size={14}
+                    color={selectedCategoryBalance.balance_ars > 0 ? colors.income : colors.error}
+                  />
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: selectedCategoryBalance.balance_ars > 0 ? colors.income : colors.error, marginLeft: 4 }}
+                  >
+                    Disponible: {formatCurrency(selectedCategoryBalance.balance_ars, 'ARS')}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* ── Rubro destino (solo transferencias) ─────────────────── */}
@@ -1067,6 +1112,14 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: spacing.xxs,
     fontSize: 12,
+  },
+  balanceHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
+    marginTop: spacing.xxs,
   },
   approvalNote: {
     flexDirection: 'row',
