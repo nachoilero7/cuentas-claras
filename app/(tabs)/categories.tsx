@@ -161,7 +161,18 @@ interface CategoryCardProps {
   onPress: () => void;
 }
 
+function getCategoryInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return '?';
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return trimmed.substring(0, 2).toUpperCase();
+}
+
 const CategoryCard = memo(function CategoryCard({ category, colors, onPress }: CategoryCardProps) {
+  const hasIcon = !!category.icon;
   const iconName = (category.icon ?? 'tag') as keyof typeof MaterialCommunityIcons.glyphMap;
   const categoryColor = category.color ?? colors.primary;
 
@@ -172,7 +183,7 @@ const CategoryCard = memo(function CategoryCard({ category, colors, onPress }: C
   return (
     <Card variant="elevated" padding="none" onPress={onPress}>
       <View style={styles.cardContent}>
-        {/* Indicador de color e icono */}
+        {/* Indicador de color e icono/iniciales */}
         <View style={styles.cardLeft}>
           <View
             style={[
@@ -183,14 +194,20 @@ const CategoryCard = memo(function CategoryCard({ category, colors, onPress }: C
           <View
             style={[
               styles.iconContainer,
-              { backgroundColor: categoryColor + '18' },
+              { backgroundColor: hasIcon ? categoryColor + '18' : categoryColor },
             ]}
           >
-            <MaterialCommunityIcons
-              name={iconName}
-              size={24}
-              color={categoryColor}
-            />
+            {hasIcon ? (
+              <MaterialCommunityIcons
+                name={iconName}
+                size={24}
+                color={categoryColor}
+              />
+            ) : (
+              <Text style={styles.iconInitials}>
+                {getCategoryInitials(category.name)}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -304,6 +321,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconInitials: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   cardInfo: {
     flex: 1,

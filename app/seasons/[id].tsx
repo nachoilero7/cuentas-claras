@@ -89,22 +89,27 @@ export default function SeasonFormScreen() {
 
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
-  const hasUnsavedChanges = useRef(false);
-  const isInitialMount = useRef(true);
+  const savedRef = useRef(false);
 
-  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+  // Determinar si hay cambios sin guardar comparando valores actuales vs originales
+  const hasUnsavedChanges = useCallback(() => {
+    if (savedRef.current) return false;
+    if (isCreateMode) {
+      return name.trim() !== '' || description.trim() !== '';
     }
-    hasUnsavedChanges.current = true;
-  }, [name, description, startDate, endDate, status, isCurrent]);
+    if (!season) return false;
+    return (
+      name !== (season.name ?? '') ||
+      description !== (season.description ?? '') ||
+      status !== (season.status ?? 'planning') ||
+      isCurrent !== (season.is_current ?? false)
+    );
+  }, [isCreateMode, season, name, description, status, isCurrent]);
 
   // Advertir al usuario si navega con cambios sin guardar
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!hasUnsavedChanges.current) return;
+      if (!hasUnsavedChanges()) return;
 
       e.preventDefault();
       Alert.alert(
@@ -117,7 +122,7 @@ export default function SeasonFormScreen() {
       );
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, hasUnsavedChanges]);
 
   // ── Pre-rellenar en modo edicion ──────────────────────────────────────────
 
@@ -133,8 +138,6 @@ export default function SeasonFormScreen() {
       );
       setStatus(season.status ?? 'planning');
       setIsCurrent(season.is_current ?? false);
-      // Prefill no cuenta como cambio del usuario
-      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, season]);
 
@@ -190,7 +193,7 @@ export default function SeasonFormScreen() {
     try {
       if (isCreateMode) {
         const result = await createSeason.mutateAsync(payload);
-        hasUnsavedChanges.current = false;
+        savedRef.current = true;
         if (result) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Temporada creada exitosamente', 'success');
@@ -204,7 +207,7 @@ export default function SeasonFormScreen() {
           await setCurrentSeason.mutateAsync(id!);
         }
 
-        hasUnsavedChanges.current = false;
+        savedRef.current = true;
         if (result) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Temporada actualizada exitosamente', 'success');

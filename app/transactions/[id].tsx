@@ -157,23 +157,37 @@ export default function TransactionFormScreen() {
 
   // ── Navegacion y cambios sin guardar ────────────────────────────────────────
   const navigation = useNavigation();
-  const hasUnsavedChanges = useRef(false);
   const isSubmittingRef = useRef(false);
-  const isInitialMount = useRef(true);
+  const savedRef = useRef(false);
 
-  // Marcar formulario como modificado cuando cambian los campos (skip inicial)
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
+  // Determinar si hay cambios sin guardar comparando valores actuales vs originales
+  const hasUnsavedChanges = useCallback(() => {
+    if (savedRef.current) return false;
+    if (isCreateMode) {
+      return (
+        amount.trim() !== '' ||
+        description.trim() !== '' ||
+        notes.trim() !== '' ||
+        categoryId !== '' ||
+        pendingImages.length > 0
+      );
     }
-    hasUnsavedChanges.current = true;
-  }, [type, amount, currency, exchangeRate, description, notes, categoryId, transferToCategoryId, transactionDate, paymentMethod, pendingImages]);
+    if (!transaction) return false;
+    return (
+      type !== transaction.type ||
+      amount !== String(transaction.amount) ||
+      currency !== transaction.currency ||
+      description !== (transaction.description ?? '') ||
+      notes !== (transaction.notes ?? '') ||
+      categoryId !== (transaction.category_id ?? '') ||
+      paymentMethod !== (transaction.payment_method ?? 'cash')
+    );
+  }, [isCreateMode, transaction, type, amount, currency, description, notes, categoryId, paymentMethod, pendingImages]);
 
   // Advertir al usuario si navega con cambios sin guardar
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!hasUnsavedChanges.current) return;
+      if (!hasUnsavedChanges()) return;
 
       e.preventDefault();
       Alert.alert(
@@ -186,7 +200,7 @@ export default function TransactionFormScreen() {
       );
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, hasUnsavedChanges]);
 
   // Validacion inline por campo
   const validateField = useCallback(
@@ -236,8 +250,6 @@ export default function TransactionFormScreen() {
       setTransferToCategoryId(transaction.transfer_to_category_id ?? '');
       setTransactionDate(new Date(transaction.transaction_date + 'T12:00:00'));
       setPaymentMethod(transaction.payment_method ?? 'cash');
-      // Prefill no cuenta como cambio del usuario
-      setTimeout(() => { hasUnsavedChanges.current = false; }, 0);
     }
   }, [isCreateMode, transaction]);
 
@@ -376,24 +388,24 @@ export default function TransactionFormScreen() {
             { type: 'approval_pending', transactionId: result.id },
           );
 
-          hasUnsavedChanges.current = false;
+          savedRef.current = true;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Movimiento enviado para aprobacion', 'success');
           router.back();
         } else if (result) {
-          hasUnsavedChanges.current = false;
+          savedRef.current = true;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Movimiento registrado exitosamente', 'success');
           router.back();
         }
         // result === null → encolado offline, snackbar ya mostrado por useOfflineAware
         if (!result) {
-          hasUnsavedChanges.current = false;
+          savedRef.current = true;
           router.back();
         }
       } else {
         const updateResult = await updateTransaction.mutateAsync({ id: id!, ...payload });
-        hasUnsavedChanges.current = false;
+        savedRef.current = true;
         if (updateResult) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           showSnackbar('Movimiento actualizado exitosamente', 'success');

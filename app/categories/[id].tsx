@@ -54,6 +54,18 @@ const categorySchema = z.object({
     .or(z.literal('')),
 });
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function getInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return '?';
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return trimmed.substring(0, 2).toUpperCase();
+}
+
 // ── Componente ──────────────────────────────────────────────────────────────
 
 export default function CategoryFormScreen() {
@@ -141,11 +153,7 @@ export default function CategoryFormScreen() {
   useEffect(() => {
     if (!isCreateMode) return;
     const suggested = suggestIcon(name);
-    if (suggested) {
-      setIcon(suggested);
-    } else if (name.trim().length < 2) {
-      setIcon('');
-    }
+    setIcon(suggested ?? '');
   }, [isCreateMode, name]);
 
   // Pre-rellenar en modo edicion
@@ -362,7 +370,7 @@ export default function CategoryFormScreen() {
               {isCreateMode ? 'Nuevo Rubro' : 'Editar Rubro'}
             </Text>
 
-            {/* Preview de icono y color auto-asignados */}
+            {/* Preview de icono/iniciales y color */}
             <View style={styles.autoPreviewRow}>
               <View
                 style={[
@@ -370,20 +378,26 @@ export default function CategoryFormScreen() {
                   { backgroundColor: color || colors.surfaceVariant },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name={icon ? (icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']) : 'tag-outline'}
-                  size={32}
-                  color="#fff"
-                />
+                {icon ? (
+                  <MaterialCommunityIcons
+                    name={icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
+                    size={32}
+                    color="#fff"
+                  />
+                ) : (
+                  <Text style={styles.autoPreviewInitials}>
+                    {getInitials(name)}
+                  </Text>
+                )}
               </View>
               <View style={styles.autoPreviewText}>
                 <Text variant="labelMedium" style={{ color: colors.textSecondary }}>
-                  {isCreateMode ? 'Icono y color automaticos' : 'Icono y color del rubro'}
+                  {icon ? 'Icono asignado automaticamente' : 'Color asignado automaticamente'}
                 </Text>
                 <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
-                  {isCreateMode
-                    ? 'Se asignan segun el nombre del rubro'
-                    : 'Se actualizan al cambiar el nombre'}
+                  {name.trim().length >= 2
+                    ? (icon ? 'Basado en el nombre del rubro' : 'Las iniciales se muestran como identificador')
+                    : 'Escribi un nombre para ver la preview'}
                 </Text>
               </View>
             </View>
@@ -525,6 +539,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  autoPreviewInitials: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   autoPreviewText: {
     flex: 1,

@@ -62,15 +62,17 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
   }
 
-  // Obtener token de push
+  // Obtener token de push (requiere projectId de EAS)
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId ?? undefined,
-    });
+    if (!projectId) {
+      if (__DEV__) console.debug('[Push] Sin projectId de EAS, push tokens no disponibles en desarrollo');
+      return null;
+    }
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     return tokenData.data;
   } catch (error) {
-    if (__DEV__) console.error('Error obteniendo push token:', error);
+    if (__DEV__) console.debug('[Push] Push token no disponible:', error);
     return null;
   }
 }
