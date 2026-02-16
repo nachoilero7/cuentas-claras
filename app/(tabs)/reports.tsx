@@ -315,9 +315,12 @@ export default function ReportsScreen() {
         {showFilters && (
           <Card variant="outlined" padding="md" style={{ marginTop: spacing.sm }}>
             {/* Periodo rapido */}
-            <Text variant="labelLarge" style={[styles.filterLabel, { color: colors.textSecondary }]}>
-              Periodo rapido
-            </Text>
+            <View style={styles.filterLabelRow}>
+              <MaterialCommunityIcons name="calendar-outline" size={14} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>
+                Periodo
+              </Text>
+            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -330,16 +333,17 @@ export default function ReportsScreen() {
                     key={preset.key}
                     mode={isActive ? 'flat' : 'outlined'}
                     selected={isActive}
+                    compact
                     onPress={() => handlePresetSelect(preset)}
                     style={[
                       styles.chip,
                       isActive
-                        ? { backgroundColor: colors.primary }
+                        ? { backgroundColor: colors.info + 'E6' }
                         : { backgroundColor: colors.surface, borderColor: colors.outline },
                     ]}
                     textStyle={[
                       styles.chipText,
-                      { color: isActive ? colors.onPrimary : colors.textSecondary },
+                      { color: isActive ? '#FFFFFF' : colors.textSecondary },
                     ]}
                     showSelectedOverlay={false}
                     showSelectedCheck={false}
@@ -351,9 +355,12 @@ export default function ReportsScreen() {
             </ScrollView>
 
             {/* Rango de fechas */}
-            <Text variant="labelLarge" style={[styles.filterLabel, { color: colors.textSecondary, marginTop: spacing.smd }]}>
-              Rango de fechas
-            </Text>
+            <View style={[styles.filterLabelRow, { marginTop: spacing.smd }]}>
+              <MaterialCommunityIcons name="calendar-range" size={14} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>
+                Rango personalizado
+              </Text>
+            </View>
             <View style={styles.dateRow}>
               <View style={styles.dateInputWrapper}>
                 <Text variant="labelSmall" style={{ color: colors.textTertiary, marginBottom: spacing.xxs }}>
@@ -400,12 +407,12 @@ export default function ReportsScreen() {
             </View>
 
             {/* Tipo de transaccion */}
-            <Text
-              variant="labelLarge"
-              style={[styles.filterLabel, { color: colors.textSecondary, marginTop: spacing.smd }]}
-            >
-              Tipo de movimiento
-            </Text>
+            <View style={[styles.filterLabelRow, { marginTop: spacing.smd }]}>
+              <MaterialCommunityIcons name="shape-outline" size={14} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>
+                Tipo
+              </Text>
+            </View>
             <View style={styles.chipsRow}>
               {FILTER_CHIPS.map((chip) => {
                 const isActive = activeTypeFilter === chip.key;
@@ -414,6 +421,7 @@ export default function ReportsScreen() {
                     key={chip.key}
                     mode={isActive ? 'flat' : 'outlined'}
                     selected={isActive}
+                    compact
                     onPress={() => handleTypeFilterChange(chip.key)}
                     accessibilityLabel={`Filtro tipo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
                     accessibilityState={{ selected: isActive }}
@@ -437,12 +445,12 @@ export default function ReportsScreen() {
             </View>
 
             {/* Filtro por rubro */}
-            <Text
-              variant="labelLarge"
-              style={[styles.filterLabel, { color: colors.textSecondary, marginTop: spacing.smd }]}
-            >
-              Rubro
-            </Text>
+            <View style={[styles.filterLabelRow, { marginTop: spacing.smd }]}>
+              <MaterialCommunityIcons name="tag-outline" size={14} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>
+                Rubro
+              </Text>
+            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -451,6 +459,7 @@ export default function ReportsScreen() {
               <Chip
                 mode={categoryFilter === undefined ? 'flat' : 'outlined'}
                 selected={categoryFilter === undefined}
+                compact
                 onPress={() => handleCategoryFilterChange(undefined)}
                 style={[
                   styles.chip,
@@ -465,7 +474,7 @@ export default function ReportsScreen() {
                 showSelectedOverlay={false}
                 showSelectedCheck={false}
               >
-                Todos los rubros
+                Todos
               </Chip>
               {categories?.map((cat) => {
                 const isActive = categoryFilter === cat.id;
@@ -474,6 +483,7 @@ export default function ReportsScreen() {
                     key={cat.id}
                     mode={isActive ? 'flat' : 'outlined'}
                     selected={isActive}
+                    compact
                     onPress={() => handleCategoryFilterChange(cat.id)}
                     style={[
                       styles.chip,
@@ -490,7 +500,7 @@ export default function ReportsScreen() {
                     icon={cat.icon ? () => (
                       <MaterialCommunityIcons
                         name={(cat.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'folder'}
-                        size={16}
+                        size={14}
                         color={isActive ? colors.onPrimary : (cat.color ?? colors.textSecondary)}
                       />
                     ) : undefined}
@@ -790,9 +800,17 @@ const styles = StyleSheet.create({
   },
 
   // ── Filtros ──────────────────────────────────────────────────────────────
-  filterLabel: {
+  filterLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginBottom: spacing.xs,
+  },
+  filterSectionLabel: {
+    fontSize: 10,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   dateRow: {
     flexDirection: 'row',
@@ -811,14 +829,17 @@ const styles = StyleSheet.create({
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   chip: {
-    borderRadius: 20,
+    borderRadius: 16,
+    height: 30,
   },
   chipText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
+    marginVertical: 0,
+    marginHorizontal: 0,
   },
   filterActions: {
     flexDirection: 'row',

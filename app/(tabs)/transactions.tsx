@@ -233,17 +233,19 @@ export default function TransactionsScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Filtros */}
         <View style={styles.filtersContainer}>
-          <FilterChips
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            colors={colors}
-          />
-          <View style={styles.dateChipsRow}>
-            <DateFilterChips
-              activeFilter={activeDateFilter}
-              onFilterChange={setActiveDateFilter}
-              colors={colors}
-            />
+          <View style={styles.filterSection}>
+            <View style={styles.filterLabelRow}>
+              <MaterialCommunityIcons name="shape-outline" size={12} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>Tipo</Text>
+            </View>
+            <FilterChips activeFilter={activeFilter} onFilterChange={setActiveFilter} colors={colors} />
+          </View>
+          <View style={styles.filterSection}>
+            <View style={styles.filterLabelRow}>
+              <MaterialCommunityIcons name="calendar-outline" size={12} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>Periodo</Text>
+            </View>
+            <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
           </View>
         </View>
 
@@ -336,16 +338,23 @@ export default function TransactionsScreen() {
               )}
             </View>
 
-            <FilterChips
-              activeFilter={activeFilter}
-              onFilterChange={(f) => { setActiveFilter(f); }}
-              colors={colors}
-            />
-            <DateFilterChips
-              activeFilter={activeDateFilter}
-              onFilterChange={setActiveDateFilter}
-              colors={colors}
-            />
+            {/* Filtros de tipo */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterLabelRow}>
+                <MaterialCommunityIcons name="shape-outline" size={12} color={colors.textTertiary} />
+                <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>Tipo</Text>
+              </View>
+              <FilterChips activeFilter={activeFilter} onFilterChange={(f) => { setActiveFilter(f); }} colors={colors} />
+            </View>
+
+            {/* Filtros de periodo */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterLabelRow}>
+                <MaterialCommunityIcons name="calendar-outline" size={12} color={colors.textTertiary} />
+                <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>Periodo</Text>
+              </View>
+              <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
+            </View>
             {activeCategoryId && (
               <Chip
                 icon="tag"
@@ -400,6 +409,7 @@ function FilterChips({ activeFilter, onFilterChange, colors }: FilterChipsProps)
             key={chip.key}
             mode={isActive ? 'flat' : 'outlined'}
             selected={isActive}
+            compact
             onPress={() => onFilterChange(chip.key)}
             accessibilityLabel={`Filtro: ${chip.label}${isActive ? ', seleccionado' : ''}`}
             accessibilityState={{ selected: isActive }}
@@ -442,19 +452,19 @@ function DateFilterChips({ activeFilter, onFilterChange, colors }: DateFilterChi
             key={chip.key}
             mode={isActive ? 'flat' : 'outlined'}
             selected={isActive}
+            compact
             onPress={() => onFilterChange(chip.key)}
             accessibilityLabel={`Periodo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
             accessibilityState={{ selected: isActive }}
-            icon={chip.icon}
             style={[
               styles.chip,
               isActive
-                ? { backgroundColor: colors.primary }
+                ? { backgroundColor: colors.info + 'E6' }
                 : { backgroundColor: colors.surface, borderColor: colors.outline },
             ]}
             textStyle={[
               styles.chipText,
-              { color: isActive ? colors.onPrimary : colors.textSecondary },
+              { color: isActive ? '#FFFFFF' : colors.textSecondary },
             ]}
             showSelectedOverlay={false}
             showSelectedCheck={false}
@@ -629,9 +639,11 @@ const styles = StyleSheet.create({
   filtersContainer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.smd,
+    gap: spacing.sm,
   },
   filtersWrapper: {
     paddingBottom: spacing.sm,
+    gap: spacing.sm,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -647,20 +659,35 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
   },
+  filterSection: {
+    gap: spacing.xxs,
+  },
+  filterLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: spacing.xxs,
+  },
+  filterSectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  dateChipsRow: {
-    marginTop: spacing.sm,
+    gap: spacing.xs,
   },
   chip: {
-    borderRadius: 20,
+    borderRadius: 16,
+    height: 30,
   },
   chipText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
+    marginVertical: 0,
+    marginHorizontal: 0,
   },
   listContent: {
     padding: spacing.md,

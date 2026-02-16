@@ -193,6 +193,12 @@ export default function SeasonFormScreen() {
     try {
       if (isCreateMode) {
         const result = await createSeason.mutateAsync(payload);
+
+        // Si se marco como temporada actual, establecerla
+        if (isCurrent && result?.id) {
+          await setCurrentSeason.mutateAsync(result.id);
+        }
+
         savedRef.current = true;
         if (result) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -438,8 +444,8 @@ export default function SeasonFormScreen() {
               ) : null}
             </View>
 
-            {/* ── Marcar como temporada actual (solo edicion y admin) ─────────── */}
-            {!isCreateMode && isAdmin && (
+            {/* ── Marcar como temporada actual ──────────────────────────────── */}
+            {isAdmin && (
               <View style={styles.switchRow}>
                 <View style={styles.switchLabelContainer}>
                   <MaterialCommunityIcons
