@@ -543,40 +543,29 @@ const TransactionCard = memo(function TransactionCard({ transaction, colors, onP
             {subtitle}
           </Text>
 
-          <View style={styles.metaRow}>
-            <Text
-              variant="labelSmall"
-              style={{ color: colors.textTertiary }}
-            >
-              {formatDate(transaction.transaction_date)}
-            </Text>
-            {transaction.creator?.display_name && (
-              <View style={styles.creatorBadge}>
-                <MaterialCommunityIcons
-                  name="account-outline"
-                  size={11}
-                  color={colors.textTertiary}
-                />
-                <Text
-                  variant="labelSmall"
-                  style={{ color: colors.textTertiary, fontSize: 10 }}
-                  numberOfLines={1}
-                >
-                  {transaction.creator.display_name}
+          <View style={styles.metaColumn}>
+            <View style={styles.metaItem}>
+              <MaterialCommunityIcons name="calendar-outline" size={11} color={colors.textTertiary} />
+              <Text variant="labelSmall" style={{ color: colors.textTertiary, fontSize: 10 }}>
+                {formatDate(transaction.transaction_date)}
+              </Text>
+            </View>
+            {transaction.creator && (
+              <View style={styles.metaItem}>
+                <MaterialCommunityIcons name="account-outline" size={11} color={colors.textTertiary} />
+                <Text variant="labelSmall" style={{ color: colors.textTertiary, fontSize: 10 }} numberOfLines={1}>
+                  {transaction.creator.display_name || transaction.creator.full_name}
                 </Text>
               </View>
             )}
             {transaction.payment_method && (
-              <View style={styles.paymentMethodBadge}>
+              <View style={styles.metaItem}>
                 <MaterialCommunityIcons
                   name={PAYMENT_METHOD_ICONS[transaction.payment_method] as keyof typeof MaterialCommunityIcons.glyphMap}
-                  size={12}
+                  size={11}
                   color={colors.textTertiary}
                 />
-                <Text
-                  variant="labelSmall"
-                  style={{ color: colors.textTertiary, fontSize: 10 }}
-                >
+                <Text variant="labelSmall" style={{ color: colors.textTertiary, fontSize: 10 }}>
                   {PAYMENT_METHOD_LABELS[transaction.payment_method]}
                 </Text>
               </View>
@@ -740,21 +729,13 @@ const styles = StyleSheet.create({
   description: {
     fontWeight: '600',
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  creatorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  metaColumn: {
     gap: 2,
-    maxWidth: 100,
   },
-  paymentMethodBadge: {
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
   },
   amountContainer: {
     alignItems: 'flex-end',

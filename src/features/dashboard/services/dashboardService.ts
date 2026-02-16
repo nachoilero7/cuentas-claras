@@ -94,17 +94,12 @@ export async function getCategoryBreakdown(params?: CategoryBreakdownParams) {
   return { data: (data as CategoryBreakdown[] | null) ?? [], error };
 }
 
-// ─── Obtener balances por categoria desde la vista ───────────────────────────
+// ─── Obtener balances por categoria (RPC filtra transacciones por temporada) ─
 
 export async function getCategoryBalances(seasonId?: string) {
-  let query = supabase.from('category_balances').select('*');
-
-  // Filtrar por temporada si se proporciona
-  if (seasonId) {
-    query = query.eq('season_id', seasonId);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_category_balances', {
+    p_season_id: seasonId ?? null,
+  });
 
   return { data: (data as CategoryBalance[] | null) ?? [], error };
 }

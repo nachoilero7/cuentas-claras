@@ -25,6 +25,7 @@ import {
   useUpdateCategory,
   useDeleteCategory,
 } from '@/src/features/categories/hooks/useCategories';
+import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
 import { suggestIcon, pickUnusedColor } from '@/src/features/categories/utils/categoryDefaults';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
@@ -78,6 +79,7 @@ export default function CategoryFormScreen() {
   const isAdmin = role === 'admin';
 
   // Hooks de datos
+  const { data: currentSeason } = useCurrentSeason();
   const { data: categories } = useCategories();
   const { data: category, isLoading: isCategoryLoading, error: categoryError } = useCategory(
     isCreateMode ? '' : id!
@@ -240,7 +242,10 @@ export default function CategoryFormScreen() {
 
     try {
       if (isCreateMode) {
-        const result = await createCategory.mutateAsync(payload);
+        const result = await createCategory.mutateAsync({
+          ...payload,
+          season_id: currentSeason?.id ?? null,
+        });
         savedRef.current = true;
         if (result) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -271,6 +276,7 @@ export default function CategoryFormScreen() {
     id,
     createCategory,
     updateCategory,
+    currentSeason,
   ]);
 
   // ── Eliminar categoria ────────────────────────────────────────────────────
