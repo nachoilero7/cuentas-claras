@@ -1,7 +1,7 @@
 export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
 import { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { Text, Chip } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator, Pressable } from 'react-native';
+import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
@@ -300,16 +300,20 @@ export default function ReportsScreen() {
           <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>
             Filtros
           </Text>
-          <Chip
-            mode="outlined"
+          <Pressable
             onPress={handleToggleFilters}
-            style={{ backgroundColor: colors.surface, borderColor: colors.outline }}
-            textStyle={{ color: colors.textSecondary, fontSize: 12 }}
-            icon={showFilters ? 'chevron-up' : 'chevron-down'}
-            compact
+            accessibilityRole="button"
+            style={[styles.toggleChip, { backgroundColor: colors.surface, borderColor: colors.outline }]}
           >
-            {showFilters ? 'Ocultar' : 'Mostrar'}
-          </Chip>
+            <MaterialCommunityIcons
+              name={showFilters ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={colors.textSecondary}
+            />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+              {showFilters ? 'Ocultar' : 'Mostrar'}
+            </Text>
+          </Pressable>
         </View>
 
         {showFilters && (
@@ -329,27 +333,27 @@ export default function ReportsScreen() {
               {DATE_PRESETS.map((preset) => {
                 const isActive = selectedPreset === preset.key;
                 return (
-                  <Chip
+                  <Pressable
                     key={preset.key}
-                    mode={isActive ? 'flat' : 'outlined'}
-                    selected={isActive}
-                    compact
                     onPress={() => handlePresetSelect(preset)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
                     style={[
                       styles.chip,
                       isActive
                         ? { backgroundColor: colors.info + 'E6' }
-                        : { backgroundColor: colors.surface, borderColor: colors.outline },
+                        : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
                     ]}
-                    textStyle={[
-                      styles.chipText,
-                      { color: isActive ? '#FFFFFF' : colors.textSecondary },
-                    ]}
-                    showSelectedOverlay={false}
-                    showSelectedCheck={false}
                   >
-                    {preset.label}
-                  </Chip>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: isActive ? '#FFFFFF' : colors.textSecondary },
+                      ]}
+                    >
+                      {preset.label}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -417,29 +421,28 @@ export default function ReportsScreen() {
               {FILTER_CHIPS.map((chip) => {
                 const isActive = activeTypeFilter === chip.key;
                 return (
-                  <Chip
+                  <Pressable
                     key={chip.key}
-                    mode={isActive ? 'flat' : 'outlined'}
-                    selected={isActive}
-                    compact
                     onPress={() => handleTypeFilterChange(chip.key)}
                     accessibilityLabel={`Filtro tipo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
                     accessibilityState={{ selected: isActive }}
+                    accessibilityRole="button"
                     style={[
                       styles.chip,
                       isActive
                         ? { backgroundColor: colors.primary }
-                        : { backgroundColor: colors.surface, borderColor: colors.outline },
+                        : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
                     ]}
-                    textStyle={[
-                      styles.chipText,
-                      { color: isActive ? colors.onPrimary : colors.textSecondary },
-                    ]}
-                    showSelectedOverlay={false}
-                    showSelectedCheck={false}
                   >
-                    {chip.label}
-                  </Chip>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: isActive ? colors.onPrimary : colors.textSecondary },
+                      ]}
+                    >
+                      {chip.label}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </View>
@@ -456,57 +459,57 @@ export default function ReportsScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsRow}
             >
-              <Chip
-                mode={categoryFilter === undefined ? 'flat' : 'outlined'}
-                selected={categoryFilter === undefined}
-                compact
+              <Pressable
                 onPress={() => handleCategoryFilterChange(undefined)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: categoryFilter === undefined }}
                 style={[
                   styles.chip,
                   categoryFilter === undefined
                     ? { backgroundColor: colors.primary }
-                    : { backgroundColor: colors.surface, borderColor: colors.outline },
+                    : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
                 ]}
-                textStyle={[
-                  styles.chipText,
-                  { color: categoryFilter === undefined ? colors.onPrimary : colors.textSecondary },
-                ]}
-                showSelectedOverlay={false}
-                showSelectedCheck={false}
               >
-                Todos
-              </Chip>
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: categoryFilter === undefined ? colors.onPrimary : colors.textSecondary },
+                  ]}
+                >
+                  Todos
+                </Text>
+              </Pressable>
               {categories?.map((cat) => {
                 const isActive = categoryFilter === cat.id;
                 return (
-                  <Chip
+                  <Pressable
                     key={cat.id}
-                    mode={isActive ? 'flat' : 'outlined'}
-                    selected={isActive}
-                    compact
                     onPress={() => handleCategoryFilterChange(cat.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
                     style={[
-                      styles.chip,
+                      styles.chipWithIcon,
                       isActive
                         ? { backgroundColor: colors.primary }
-                        : { backgroundColor: colors.surface, borderColor: colors.outline },
+                        : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
                     ]}
-                    textStyle={[
-                      styles.chipText,
-                      { color: isActive ? colors.onPrimary : colors.textSecondary },
-                    ]}
-                    showSelectedOverlay={false}
-                    showSelectedCheck={false}
-                    icon={cat.icon ? () => (
+                  >
+                    {cat.icon && (
                       <MaterialCommunityIcons
                         name={(cat.icon as keyof typeof MaterialCommunityIcons.glyphMap) ?? 'folder'}
                         size={14}
                         color={isActive ? colors.onPrimary : (cat.color ?? colors.textSecondary)}
                       />
-                    ) : undefined}
-                  >
-                    {cat.name}
-                  </Chip>
+                    )}
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: isActive ? colors.onPrimary : colors.textSecondary },
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -619,17 +622,14 @@ export default function ReportsScreen() {
               </Card>
             </View>
 
-            {/* Chip de cantidad de movimientos */}
+            {/* Badge de cantidad de movimientos */}
             <View style={styles.countChipRow}>
-              <Chip
-                mode="flat"
-                style={{ backgroundColor: colors.surfaceVariant }}
-                textStyle={{ color: colors.textSecondary, fontSize: 12 }}
-                icon="receipt-text-outline"
-                compact
-              >
-                {summary.transactionCount} movimiento{summary.transactionCount !== 1 ? 's' : ''}
-              </Chip>
+              <View style={[styles.countBadge, { backgroundColor: colors.surfaceVariant }]}>
+                <MaterialCommunityIcons name="receipt-text-outline" size={14} color={colors.textSecondary} />
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                  {summary.transactionCount} movimiento{summary.transactionCount !== 1 ? 's' : ''}
+                </Text>
+              </View>
             </View>
           </>
         )}
@@ -833,13 +833,39 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderRadius: 16,
-    height: 30,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  chipWithIcon: {
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
   },
   chipText: {
     fontSize: 11,
     fontWeight: '500',
-    marginVertical: 0,
-    marginHorizontal: 0,
+  },
+  toggleChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  countBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   filterActions: {
     flexDirection: 'row',

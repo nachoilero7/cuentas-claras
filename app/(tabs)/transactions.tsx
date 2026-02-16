@@ -10,7 +10,7 @@ import {
   Pressable,
   Platform,
 } from 'react-native';
-import { Text, Chip, FAB } from 'react-native-paper';
+import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { startOfWeek, startOfMonth, subMonths, format } from 'date-fns';
@@ -259,14 +259,20 @@ export default function TransactionsScreen() {
             <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
           </View>
           {activeCategoryId && (
-            <Chip
-              icon="tag"
-              onClose={() => setActiveCategoryId(undefined)}
-              style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
-              textStyle={{ fontSize: 12 }}
-            >
-              Filtrando por rubro
-            </Chip>
+            <View style={styles.categoryChip}>
+              <MaterialCommunityIcons name="tag" size={14} color={colors.primary} />
+              <Text variant="labelSmall" style={{ color: colors.text, fontSize: 12 }}>
+                Filtrando por rubro
+              </Text>
+              <Pressable
+                onPress={() => setActiveCategoryId(undefined)}
+                hitSlop={8}
+                accessibilityLabel="Quitar filtro de rubro"
+                accessibilityRole="button"
+              >
+                <MaterialCommunityIcons name="close-circle" size={16} color={colors.textSecondary} />
+              </Pressable>
+            </View>
           )}
         </View>
 
@@ -390,14 +396,20 @@ export default function TransactionsScreen() {
               <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
             </View>
             {activeCategoryId && (
-              <Chip
-                icon="tag"
-                onClose={() => setActiveCategoryId(undefined)}
-                style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
-                textStyle={{ fontSize: 12 }}
-              >
-                Filtrando por rubro
-              </Chip>
+              <View style={styles.categoryChip}>
+                <MaterialCommunityIcons name="tag" size={14} color={colors.primary} />
+                <Text variant="labelSmall" style={{ color: colors.text, fontSize: 12 }}>
+                  Filtrando por rubro
+                </Text>
+                <Pressable
+                  onPress={() => setActiveCategoryId(undefined)}
+                  hitSlop={8}
+                  accessibilityLabel="Quitar filtro de rubro"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons name="close-circle" size={16} color={colors.textSecondary} />
+                </Pressable>
+              </View>
             )}
           </View>
         }
@@ -439,29 +451,28 @@ function FilterChips({ activeFilter, onFilterChange, colors }: FilterChipsProps)
       {FILTER_CHIPS.map((chip) => {
         const isActive = activeFilter === chip.key;
         return (
-          <Chip
+          <Pressable
             key={chip.key}
-            mode={isActive ? 'flat' : 'outlined'}
-            selected={isActive}
-            compact
             onPress={() => onFilterChange(chip.key)}
             accessibilityLabel={`Filtro: ${chip.label}${isActive ? ', seleccionado' : ''}`}
             accessibilityState={{ selected: isActive }}
+            accessibilityRole="button"
             style={[
               styles.chip,
               isActive
                 ? { backgroundColor: colors.primary }
-                : { backgroundColor: colors.surface, borderColor: colors.outline },
+                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
             ]}
-            textStyle={[
-              styles.chipText,
-              { color: isActive ? colors.onPrimary : colors.textSecondary },
-            ]}
-            showSelectedOverlay={false}
-            showSelectedCheck={false}
           >
-            {chip.label}
-          </Chip>
+            <Text
+              style={[
+                styles.chipText,
+                { color: isActive ? colors.onPrimary : colors.textSecondary },
+              ]}
+            >
+              {chip.label}
+            </Text>
+          </Pressable>
         );
       })}
     </View>
@@ -482,29 +493,28 @@ function DateFilterChips({ activeFilter, onFilterChange, colors }: DateFilterChi
       {DATE_FILTER_CHIPS.map((chip) => {
         const isActive = activeFilter === chip.key;
         return (
-          <Chip
+          <Pressable
             key={chip.key}
-            mode={isActive ? 'flat' : 'outlined'}
-            selected={isActive}
-            compact
             onPress={() => onFilterChange(chip.key)}
             accessibilityLabel={`Periodo: ${chip.label}${isActive ? ', seleccionado' : ''}`}
             accessibilityState={{ selected: isActive }}
+            accessibilityRole="button"
             style={[
               styles.chip,
               isActive
                 ? { backgroundColor: colors.info + 'E6' }
-                : { backgroundColor: colors.surface, borderColor: colors.outline },
+                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
             ]}
-            textStyle={[
-              styles.chipText,
-              { color: isActive ? '#FFFFFF' : colors.textSecondary },
-            ]}
-            showSelectedOverlay={false}
-            showSelectedCheck={false}
           >
-            {chip.label}
-          </Chip>
+            <Text
+              style={[
+                styles.chipText,
+                { color: isActive ? '#FFFFFF' : colors.textSecondary },
+              ]}
+            >
+              {chip.label}
+            </Text>
+          </Pressable>
         );
       })}
     </View>
@@ -720,13 +730,26 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderRadius: 16,
-    height: 30,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   chipText: {
     fontSize: 11,
     fontWeight: '500',
-    marginVertical: 0,
-    marginHorizontal: 0,
+  },
+  categoryChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    alignSelf: 'flex-start' as const,
+    gap: 6,
+    marginTop: spacing.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#00000020',
   },
   listContent: {
     padding: spacing.md,

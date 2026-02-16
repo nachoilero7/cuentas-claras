@@ -611,115 +611,131 @@ export default function DashboardScreen() {
               </View>
             ) : (
               <View style={styles.chartContainer}>
-                {/* Escala Y + grilla + barras */}
-                <View style={styles.chartWithAxis}>
-                  {/* Escala Y */}
-                  <View style={styles.yAxis}>
-                    {[1, 0.75, 0.5, 0.25, 0].map((pct) => (
-                      <Text
-                        key={`y-${pct}`}
-                        variant="labelSmall"
-                        style={[styles.yAxisLabel, { color: colors.textTertiary }]}
-                        numberOfLines={1}
-                      >
-                        {monthlyMax > 0 ? formatCompact(monthlyMax * pct) : '0'}
-                      </Text>
-                    ))}
-                  </View>
-
-                  {/* Area principal del grafico */}
-                  <View style={styles.chartMainArea}>
-                    {/* Lineas de grilla horizontales */}
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <View
-                        key={`grid-${i}`}
-                        style={[
-                          styles.gridLine,
-                          {
-                            backgroundColor: colors.outlineVariant + '50',
-                            top: (i / 4) * CHART_BAR_HEIGHT,
-                          },
-                        ]}
-                      />
-                    ))}
-
-                    {/* Barras agrupadas por mes (ancho adaptativo) */}
-                    <View style={styles.chartBarsArea}>
-                      {monthlyData.map((month) => {
-                        const incomeH = monthlyMax > 0 ? (month.income / monthlyMax) * CHART_BAR_HEIGHT : 0;
-                        const expenseH = monthlyMax > 0 ? (month.expenses / monthlyMax) * CHART_BAR_HEIGHT : 0;
-                        const net = month.income - month.expenses;
-                        const netColor = net >= 0 ? colors.income : colors.expense;
-                        // Barras mas anchas cuando hay pocos meses
-                        const barW = monthlyData.length <= 2 ? 30 : monthlyData.length <= 4 ? 22 : 16;
-
-                        return (
-                          <View key={month.month} style={styles.monthGroup}>
-                            {/* Montos sobre las barras */}
-                            <View style={styles.barTopLabels}>
-                              <Text
-                                variant="labelSmall"
-                                style={[styles.barTopLabel, { color: colors.income }]}
-                                numberOfLines={1}
-                              >
-                                {formatCompact(month.income)}
-                              </Text>
-                              <Text
-                                variant="labelSmall"
-                                style={[styles.barTopLabel, { color: colors.expense }]}
-                                numberOfLines={1}
-                              >
-                                {formatCompact(month.expenses)}
-                              </Text>
-                            </View>
-
-                            {/* Par de barras */}
-                            <View style={[styles.monthBars, { gap: Math.max(barW * 0.15, 3) }]}>
-                              <View
-                                style={[
-                                  styles.monthBar,
-                                  {
-                                    width: barW,
-                                    height: Math.max(incomeH, 3),
-                                    backgroundColor: colors.income,
-                                  },
-                                ]}
-                              />
-                              <View
-                                style={[
-                                  styles.monthBar,
-                                  {
-                                    width: barW,
-                                    height: Math.max(expenseH, 3),
-                                    backgroundColor: colors.expense,
-                                  },
-                                ]}
-                              />
-                            </View>
-
-                            {/* Label del mes */}
+                {(() => {
+                  const barW = monthlyData.length <= 2 ? 30 : monthlyData.length <= 4 ? 22 : 16;
+                  return (
+                    <>
+                      {/* Fila de montos sobre las barras */}
+                      <View style={styles.chartRow}>
+                        <View style={styles.yAxisSpacer} />
+                        {monthlyData.map((month) => (
+                          <View key={`top-${month.month}`} style={styles.monthColumn}>
                             <Text
                               variant="labelSmall"
-                              style={[styles.monthLabel, { color: colors.textSecondary }]}
+                              style={[styles.barTopLabel, { color: colors.income }]}
                               numberOfLines={1}
                             >
-                              {month.label.split(' ')[0].slice(0, 3)}
+                              {formatCompact(month.income)}
                             </Text>
-
-                            {/* Neto del mes */}
                             <Text
                               variant="labelSmall"
-                              style={[styles.monthNet, { color: netColor }]}
+                              style={[styles.barTopLabel, { color: colors.expense }]}
                               numberOfLines={1}
                             >
-                              {net >= 0 ? '+' : ''}{formatCompact(net)}
+                              {formatCompact(month.expenses)}
                             </Text>
                           </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-                </View>
+                        ))}
+                      </View>
+
+                      {/* Eje Y + grilla + barras */}
+                      <View style={styles.chartWithAxis}>
+                        {/* Escala Y */}
+                        <View style={styles.yAxis}>
+                          {[1, 0.75, 0.5, 0.25, 0].map((pct) => (
+                            <Text
+                              key={`y-${pct}`}
+                              variant="labelSmall"
+                              style={[styles.yAxisLabel, { color: colors.textTertiary }]}
+                              numberOfLines={1}
+                            >
+                              {monthlyMax > 0 ? formatCompact(monthlyMax * pct) : '0'}
+                            </Text>
+                          ))}
+                        </View>
+
+                        {/* Area de barras con grilla */}
+                        <View style={styles.chartMainArea}>
+                          {/* Lineas de grilla horizontales */}
+                          {[0, 1, 2, 3, 4].map((i) => (
+                            <View
+                              key={`grid-${i}`}
+                              style={[
+                                styles.gridLine,
+                                {
+                                  backgroundColor: colors.outlineVariant + '50',
+                                  top: (i / 4) * CHART_BAR_HEIGHT,
+                                },
+                              ]}
+                            />
+                          ))}
+
+                          {/* Barras agrupadas por mes */}
+                          <View style={styles.chartBarsArea}>
+                            {monthlyData.map((month) => {
+                              const incomeH = monthlyMax > 0 ? (month.income / monthlyMax) * CHART_BAR_HEIGHT : 0;
+                              const expenseH = monthlyMax > 0 ? (month.expenses / monthlyMax) * CHART_BAR_HEIGHT : 0;
+
+                              return (
+                                <View key={month.month} style={styles.monthColumn}>
+                                  <View style={[styles.monthBars, { gap: Math.max(barW * 0.15, 3) }]}>
+                                    <View
+                                      style={[
+                                        styles.monthBar,
+                                        {
+                                          width: barW,
+                                          height: Math.max(incomeH, 3),
+                                          backgroundColor: colors.income,
+                                        },
+                                      ]}
+                                    />
+                                    <View
+                                      style={[
+                                        styles.monthBar,
+                                        {
+                                          width: barW,
+                                          height: Math.max(expenseH, 3),
+                                          backgroundColor: colors.expense,
+                                        },
+                                      ]}
+                                    />
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Fila de labels de mes */}
+                      <View style={styles.chartRow}>
+                        <View style={styles.yAxisSpacer} />
+                        {monthlyData.map((month) => {
+                          const net = month.income - month.expenses;
+                          const netColor = net >= 0 ? colors.income : colors.expense;
+                          return (
+                            <View key={`lbl-${month.month}`} style={styles.monthColumn}>
+                              <Text
+                                variant="labelSmall"
+                                style={[styles.monthLabel, { color: colors.textSecondary }]}
+                                numberOfLines={1}
+                              >
+                                {month.label.split(' ')[0].slice(0, 3)}
+                              </Text>
+                              <Text
+                                variant="labelSmall"
+                                style={[styles.monthNet, { color: netColor }]}
+                                numberOfLines={1}
+                              >
+                                {net >= 0 ? '+' : ''}{formatCompact(net)}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </>
+                  );
+                })()}
 
                 {/* Totales del periodo */}
                 <View style={[styles.chartTotalsRow, { borderTopColor: colors.outlineVariant }]}>
@@ -1085,22 +1101,27 @@ const styles = StyleSheet.create({
 
   // Grafico mensual custom
   chartContainer: {
-    gap: spacing.sm,
+    gap: spacing.xs,
+  },
+  chartRow: {
+    flexDirection: 'row',
+  },
+  yAxisSpacer: {
+    width: 42,
   },
   chartWithAxis: {
     flexDirection: 'row',
-    gap: spacing.xxs,
   },
   yAxis: {
-    width: 38,
+    width: 42,
     height: CHART_BAR_HEIGHT,
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingRight: 4,
   },
   yAxisLabel: {
-    fontSize: 8,
-    lineHeight: 10,
+    fontSize: 9,
+    lineHeight: 11,
   },
   chartMainArea: {
     flex: 1,
@@ -1119,24 +1140,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     height: CHART_BAR_HEIGHT,
   },
-  monthGroup: {
+  monthColumn: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
-  },
-  barTopLabels: {
-    flexDirection: 'row',
-    gap: 2,
   },
   barTopLabel: {
-    fontSize: 8,
-    lineHeight: 10,
+    fontSize: 9,
+    lineHeight: 12,
     textAlign: 'center',
+    fontWeight: '500',
   },
   monthBars: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 3,
   },
   monthBar: {
     borderTopLeftRadius: 4,
@@ -1145,8 +1161,9 @@ const styles = StyleSheet.create({
   },
   monthLabel: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
     textAlign: 'center',
+    marginTop: 2,
   },
   monthNet: {
     fontSize: 9,
