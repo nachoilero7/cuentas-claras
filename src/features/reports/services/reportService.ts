@@ -41,7 +41,8 @@ export interface CategoryReportItem {
 const REPORT_SELECT = `
   *,
   category:categories!category_id(id, name, color, icon),
-  transfer_to_category:categories!transfer_to_category_id(id, name, color, icon)
+  transfer_to_category:categories!transfer_to_category_id(id, name, color, icon),
+  creator:profiles!created_by(display_name, full_name)
 `;
 
 // ── Aplicar filtros comunes a una query de transacciones ────────────────────
