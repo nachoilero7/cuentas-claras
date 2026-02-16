@@ -15,6 +15,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
+import Svg, { Circle } from 'react-native-svg';
+
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
@@ -31,6 +33,23 @@ import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing, borderRadius } from '@/src/shared/theme/spacing';
 
+// ── Constantes del grafico ────────────────────────────────────────────────────
+const CHART_BAR_HEIGHT = 160;
+const DONUT_SIZE = 150;
+const DONUT_STROKE = 22;
+const DONUT_RADIUS = (DONUT_SIZE - DONUT_STROKE) / 2;
+const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
+
+// ── Formato compacto de montos (ej: $1.2M, $500K, $3.5K) ─────────────────────
+function formatCompact(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}K`;
+  if (abs === 0) return '$0';
+  return `${sign}$${Math.round(abs)}`;
+}
+
 // ── Formato de fecha actual ────────────────────────────────────────────────────
 function getCurrentDateLabel(): string {
   const now = new Date();
@@ -45,61 +64,179 @@ function getCurrentDateLabel(): string {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-// ── Componente: Tarjeta de resumen individual ──────────────────────────────────
+// ── Componente: Donut de resumen financiero ───────────────────────────────────
 
-interface SummaryCardProps {
-  label: string;
-  amount: number;
-  amountUsd?: number;
-  color: string;
-  iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  backgroundColor: string;
+interface DonutSummaryProps {
+  income: number;
+  expenses: number;
+  incomeUsd: number;
+  expensesUsd: number;
+  balance: number;
+  balanceUsd: number;
+  incomeColor: string;
+  expenseColor: string;
+  balanceColor: string;
+  surfaceColor: string;
   textColor: string;
-  secondaryTextColor?: string;
+  textSecondary: string;
+  textTertiary: string;
 }
 
-const SummaryCard = React.memo(function SummaryCard({
-  label,
-  amount,
-  amountUsd,
-  color,
-  iconName,
-  backgroundColor,
+const DonutSummary = React.memo(function DonutSummary({
+  income,
+  expenses,
+  incomeUsd,
+  expensesUsd,
+  balance,
+  balanceUsd,
+  incomeColor,
+  expenseColor,
+  balanceColor,
+  surfaceColor,
   textColor,
-  secondaryTextColor,
-}: SummaryCardProps) {
-  const showUsd = amountUsd !== undefined && amountUsd !== 0;
+  textSecondary,
+  textTertiary,
+}: DonutSummaryProps) {
+  const total = income + expenses;
+  const incomePct = total > 0 ? income / total : 0.5;
+  const expensePct = total > 0 ? expenses / total : 0.5;
+  const spendRatio = income > 0 ? Math.round((expenses / income) * 100) : 0;
+
+  // SVG donut segments (income starts from top, expense follows)
+  const incomeLength = DONUT_CIRCUMFERENCE * incomePct;
+  const expenseLength = DONUT_CIRCUMFERENCE * expensePct;
+  const showUsdIncome = incomeUsd !== 0;
+  const showUsdExpenses = expensesUsd !== 0;
+  const showUsdBalance = balanceUsd !== 0;
 
   return (
-    <View style={[styles.summaryCard, { backgroundColor }]}>
-      <View style={[styles.summaryIconContainer, { backgroundColor: color + '18' }]}>
-        <MaterialCommunityIcons name={iconName} size={22} color={color} />
+    <View style={styles.donutCard}>
+      <View style={styles.donutRow}>
+        {/* Donut SVG */}
+        <View style={styles.donutContainer}>
+          <Svg width={DONUT_SIZE} height={DONUT_SIZE}>
+            {/* Track de fondo */}
+            <Circle
+              cx={DONUT_SIZE / 2}
+              cy={DONUT_SIZE / 2}
+              r={DONUT_RADIUS}
+              stroke={surfaceColor}
+              strokeWidth={DONUT_STROKE}
+              fill="none"
+            />
+            {/* Segmento de ingresos */}
+            <Circle
+              cx={DONUT_SIZE / 2}
+              cy={DONUT_SIZE / 2}
+              r={DONUT_RADIUS}
+              stroke={incomeColor}
+              strokeWidth={DONUT_STROKE}
+              fill="none"
+              strokeDasharray={`${incomeLength} ${DONUT_CIRCUMFERENCE - incomeLength}`}
+              strokeDashoffset={DONUT_CIRCUMFERENCE * 0.25}
+              strokeLinecap="round"
+            />
+            {/* Segmento de egresos */}
+            <Circle
+              cx={DONUT_SIZE / 2}
+              cy={DONUT_SIZE / 2}
+              r={DONUT_RADIUS}
+              stroke={expenseColor}
+              strokeWidth={DONUT_STROKE}
+              fill="none"
+              strokeDasharray={`${expenseLength} ${DONUT_CIRCUMFERENCE - expenseLength}`}
+              strokeDashoffset={DONUT_CIRCUMFERENCE * 0.25 - incomeLength}
+              strokeLinecap="round"
+            />
+          </Svg>
+          {/* Centro: balance */}
+          <View style={styles.donutCenter}>
+            <Text variant="labelSmall" style={{ color: textTertiary, fontSize: 9 }}>
+              Balance
+            </Text>
+            <Text
+              variant="titleSmall"
+              style={{ color: balanceColor, fontWeight: '700', fontSize: 14 }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {formatCompact(balance)}
+            </Text>
+            {spendRatio > 0 && (
+              <Text variant="labelSmall" style={{ color: textTertiary, fontSize: 8 }}>
+                {spendRatio}% gastado
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Detalle a la derecha */}
+        <View style={styles.donutDetails}>
+          {/* Ingresos */}
+          <View style={styles.donutDetailRow}>
+            <View style={[styles.donutDetailDot, { backgroundColor: incomeColor }]} />
+            <View style={styles.donutDetailTexts}>
+              <Text variant="labelSmall" style={{ color: textSecondary }}>
+                Ingresos
+              </Text>
+              <Text
+                variant="titleSmall"
+                style={{ color: incomeColor, fontWeight: '700' }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {formatCurrency(income)}
+              </Text>
+              {showUsdIncome && (
+                <Text variant="labelSmall" style={{ color: textTertiary, fontSize: 10 }}>
+                  {formatCurrency(incomeUsd, 'USD')}
+                </Text>
+              )}
+            </View>
+          </View>
+          {/* Egresos */}
+          <View style={styles.donutDetailRow}>
+            <View style={[styles.donutDetailDot, { backgroundColor: expenseColor }]} />
+            <View style={styles.donutDetailTexts}>
+              <Text variant="labelSmall" style={{ color: textSecondary }}>
+                Egresos
+              </Text>
+              <Text
+                variant="titleSmall"
+                style={{ color: expenseColor, fontWeight: '700' }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {formatCurrency(expenses)}
+              </Text>
+              {showUsdExpenses && (
+                <Text variant="labelSmall" style={{ color: textTertiary, fontSize: 10 }}>
+                  {formatCurrency(expensesUsd, 'USD')}
+                </Text>
+              )}
+            </View>
+          </View>
+          {/* Balance completo */}
+          <View style={[styles.donutDetailRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: textTertiary + '30', paddingTop: spacing.xs }]}>
+            <MaterialCommunityIcons name="scale-balance" size={14} color={balanceColor} />
+            <View style={styles.donutDetailTexts}>
+              <Text
+                variant="titleSmall"
+                style={{ color: balanceColor, fontWeight: '700' }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {formatCurrency(balance)}
+              </Text>
+              {showUsdBalance && (
+                <Text variant="labelSmall" style={{ color: textTertiary, fontSize: 10 }}>
+                  {formatCurrency(balanceUsd, 'USD')}
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
       </View>
-      <Text
-        variant="labelSmall"
-        style={[styles.summaryLabel, { color: textColor }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      <Text
-        variant="titleSmall"
-        style={[styles.summaryAmount, { color }]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-      >
-        {formatCurrency(amount ?? 0)}
-      </Text>
-      {showUsd && (
-        <Text
-          variant="labelSmall"
-          style={[styles.summaryAmountUsd, { color: secondaryTextColor ?? textColor }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {formatCurrency(amountUsd, 'USD')}
-        </Text>
-      )}
     </View>
   );
 });
@@ -283,39 +420,24 @@ export default function DashboardScreen() {
             </Card>
           )}
 
-          {/* ── Tarjetas de resumen ──────────────────────────────────── */}
-          <View style={styles.summaryRow}>
-            <SummaryCard
-              label="Ingresos"
-              amount={summary?.total_income_ars ?? 0}
-              amountUsd={summary?.total_income_usd ?? 0}
-              color={colors.income}
-              iconName="trending-up"
-              backgroundColor={colors.surface}
-              textColor={colors.textSecondary}
-              secondaryTextColor={colors.textTertiary}
+          {/* ── Donut de resumen ─────────────────────────────────────── */}
+          <Card variant="elevated" padding="md" style={styles.sectionCard}>
+            <DonutSummary
+              income={summary?.total_income_ars ?? 0}
+              expenses={summary?.total_expenses_ars ?? 0}
+              incomeUsd={summary?.total_income_usd ?? 0}
+              expensesUsd={summary?.total_expenses_usd ?? 0}
+              balance={summary?.net_balance_ars ?? 0}
+              balanceUsd={summary?.net_balance_usd ?? 0}
+              incomeColor={colors.income}
+              expenseColor={colors.expense}
+              balanceColor={balanceColor}
+              surfaceColor={colors.outlineVariant + '40'}
+              textColor={colors.text}
+              textSecondary={colors.textSecondary}
+              textTertiary={colors.textTertiary}
             />
-            <SummaryCard
-              label="Egresos"
-              amount={summary?.total_expenses_ars ?? 0}
-              amountUsd={summary?.total_expenses_usd ?? 0}
-              color={colors.expense}
-              iconName="trending-down"
-              backgroundColor={colors.surface}
-              textColor={colors.textSecondary}
-              secondaryTextColor={colors.textTertiary}
-            />
-            <SummaryCard
-              label="Balance"
-              amount={summary?.net_balance_ars ?? 0}
-              amountUsd={summary?.net_balance_usd ?? 0}
-              color={balanceColor}
-              iconName="scale-balance"
-              backgroundColor={colors.surface}
-              textColor={colors.textSecondary}
-              secondaryTextColor={colors.textTertiary}
-            />
-          </View>
+          </Card>
 
           {/* ── Fila secundaria: contadores ──────────────────────────── */}
           <View style={styles.countersRow}>
@@ -437,7 +559,7 @@ export default function DashboardScreen() {
                 variant="titleMedium"
                 style={[styles.sectionTitle, { color: colors.text }]}
               >
-                Ingresos vs Egresos (ultimos 6 meses)
+                Ingresos vs Egresos
               </Text>
             </View>
 
@@ -457,6 +579,14 @@ export default function DashboardScreen() {
                 />
                 <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
                   Egresos
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: colors.primary, width: 10, height: 3, borderRadius: 2 }]}
+                />
+                <Text variant="labelSmall" style={{ color: colors.textSecondary }}>
+                  Neto
                 </Text>
               </View>
             </View>
@@ -481,58 +611,136 @@ export default function DashboardScreen() {
               </View>
             ) : (
               <View style={styles.chartContainer}>
-                {/* Area de barras */}
-                <View style={styles.chartBarsArea}>
-                  {monthlyData.map((month) => {
-                    const incomeH = monthlyMax > 0 ? (month.income / monthlyMax) * 140 : 0;
-                    const expenseH = monthlyMax > 0 ? (month.expenses / monthlyMax) * 140 : 0;
-                    return (
-                      <View key={month.month} style={styles.monthGroup}>
-                        <View style={styles.monthBars}>
-                          <View
-                            style={[
-                              styles.monthBar,
-                              { height: Math.max(incomeH, 2), backgroundColor: colors.income },
-                            ]}
-                          />
-                          <View
-                            style={[
-                              styles.monthBar,
-                              { height: Math.max(expenseH, 2), backgroundColor: colors.expense },
-                            ]}
-                          />
-                        </View>
-                        <Text
-                          variant="labelSmall"
-                          style={[styles.monthLabel, { color: colors.textTertiary }]}
-                          numberOfLines={1}
-                        >
-                          {month.label.split(' ')[0]}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-                {/* Montos debajo del grafico */}
-                <View style={[styles.chartSummaryRow, { borderTopColor: colors.outlineVariant }]}>
-                  {monthlyData.map((month) => (
-                    <View key={`amt-${month.month}`} style={styles.monthAmounts}>
+                {/* Escala Y + grilla + barras */}
+                <View style={styles.chartWithAxis}>
+                  {/* Escala Y */}
+                  <View style={styles.yAxis}>
+                    {[1, 0.75, 0.5, 0.25, 0].map((pct) => (
                       <Text
+                        key={`y-${pct}`}
                         variant="labelSmall"
-                        style={{ color: colors.income, fontSize: 9 }}
+                        style={[styles.yAxisLabel, { color: colors.textTertiary }]}
                         numberOfLines={1}
                       >
-                        {formatCurrency(month.income)}
+                        {monthlyMax > 0 ? formatCompact(monthlyMax * pct) : '0'}
                       </Text>
-                      <Text
-                        variant="labelSmall"
-                        style={{ color: colors.expense, fontSize: 9 }}
-                        numberOfLines={1}
-                      >
-                        {formatCurrency(month.expenses)}
-                      </Text>
+                    ))}
+                  </View>
+
+                  {/* Area principal del grafico */}
+                  <View style={styles.chartMainArea}>
+                    {/* Lineas de grilla horizontales */}
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <View
+                        key={`grid-${i}`}
+                        style={[
+                          styles.gridLine,
+                          {
+                            backgroundColor: colors.outlineVariant + '50',
+                            top: (i / 4) * CHART_BAR_HEIGHT,
+                          },
+                        ]}
+                      />
+                    ))}
+
+                    {/* Barras agrupadas por mes (ancho adaptativo) */}
+                    <View style={styles.chartBarsArea}>
+                      {monthlyData.map((month) => {
+                        const incomeH = monthlyMax > 0 ? (month.income / monthlyMax) * CHART_BAR_HEIGHT : 0;
+                        const expenseH = monthlyMax > 0 ? (month.expenses / monthlyMax) * CHART_BAR_HEIGHT : 0;
+                        const net = month.income - month.expenses;
+                        const netColor = net >= 0 ? colors.income : colors.expense;
+                        // Barras mas anchas cuando hay pocos meses
+                        const barW = monthlyData.length <= 2 ? 30 : monthlyData.length <= 4 ? 22 : 16;
+
+                        return (
+                          <View key={month.month} style={styles.monthGroup}>
+                            {/* Montos sobre las barras */}
+                            <View style={styles.barTopLabels}>
+                              <Text
+                                variant="labelSmall"
+                                style={[styles.barTopLabel, { color: colors.income }]}
+                                numberOfLines={1}
+                              >
+                                {formatCompact(month.income)}
+                              </Text>
+                              <Text
+                                variant="labelSmall"
+                                style={[styles.barTopLabel, { color: colors.expense }]}
+                                numberOfLines={1}
+                              >
+                                {formatCompact(month.expenses)}
+                              </Text>
+                            </View>
+
+                            {/* Par de barras */}
+                            <View style={[styles.monthBars, { gap: Math.max(barW * 0.15, 3) }]}>
+                              <View
+                                style={[
+                                  styles.monthBar,
+                                  {
+                                    width: barW,
+                                    height: Math.max(incomeH, 3),
+                                    backgroundColor: colors.income,
+                                  },
+                                ]}
+                              />
+                              <View
+                                style={[
+                                  styles.monthBar,
+                                  {
+                                    width: barW,
+                                    height: Math.max(expenseH, 3),
+                                    backgroundColor: colors.expense,
+                                  },
+                                ]}
+                              />
+                            </View>
+
+                            {/* Label del mes */}
+                            <Text
+                              variant="labelSmall"
+                              style={[styles.monthLabel, { color: colors.textSecondary }]}
+                              numberOfLines={1}
+                            >
+                              {month.label.split(' ')[0].slice(0, 3)}
+                            </Text>
+
+                            {/* Neto del mes */}
+                            <Text
+                              variant="labelSmall"
+                              style={[styles.monthNet, { color: netColor }]}
+                              numberOfLines={1}
+                            >
+                              {net >= 0 ? '+' : ''}{formatCompact(net)}
+                            </Text>
+                          </View>
+                        );
+                      })}
                     </View>
-                  ))}
+                  </View>
+                </View>
+
+                {/* Totales del periodo */}
+                <View style={[styles.chartTotalsRow, { borderTopColor: colors.outlineVariant }]}>
+                  <View style={styles.chartTotalItem}>
+                    <MaterialCommunityIcons name="arrow-up-circle" size={14} color={colors.income} />
+                    <Text variant="labelSmall" style={{ color: colors.textSecondary, marginLeft: 4 }}>
+                      Total:{' '}
+                    </Text>
+                    <Text variant="labelSmall" style={{ color: colors.income, fontWeight: '600' }}>
+                      {formatCurrency(monthlyData.reduce((s, m) => s + m.income, 0))}
+                    </Text>
+                  </View>
+                  <View style={styles.chartTotalItem}>
+                    <MaterialCommunityIcons name="arrow-down-circle" size={14} color={colors.expense} />
+                    <Text variant="labelSmall" style={{ color: colors.textSecondary, marginLeft: 4 }}>
+                      Total:{' '}
+                    </Text>
+                    <Text variant="labelSmall" style={{ color: colors.expense, fontWeight: '600' }}>
+                      {formatCurrency(monthlyData.reduce((s, m) => s + m.expenses, 0))}
+                    </Text>
+                  </View>
                 </View>
               </View>
             )}
@@ -775,41 +983,45 @@ const styles = StyleSheet.create({
     height: 48,
   },
 
-  // Tarjetas de resumen
-  summaryRow: {
+  // Donut de resumen
+  donutCard: {
+    // contenido del Card
+  },
+  donutRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.smd,
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  summaryCard: {
-    flex: 1,
-    borderRadius: borderRadius.lg,
-    padding: spacing.smd,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+  donutContainer: {
+    width: DONUT_SIZE,
+    height: DONUT_SIZE,
+    position: 'relative',
   },
-  summaryIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.md,
+  donutCenter: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
   },
-  summaryLabel: {
-    marginBottom: spacing.xxs,
-    fontWeight: '500',
+  donutDetails: {
+    flex: 1,
+    gap: spacing.sm,
   },
-  summaryAmount: {
-    fontWeight: '700',
+  donutDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  summaryAmountUsd: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: spacing.xxs,
+  donutDetailDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  donutDetailTexts: {
+    flex: 1,
   },
 
   // Contadores secundarios
@@ -873,19 +1085,53 @@ const styles = StyleSheet.create({
 
   // Grafico mensual custom
   chartContainer: {
-    gap: spacing.xs,
+    gap: spacing.sm,
+  },
+  chartWithAxis: {
+    flexDirection: 'row',
+    gap: spacing.xxs,
+  },
+  yAxis: {
+    width: 38,
+    height: CHART_BAR_HEIGHT,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingRight: 4,
+  },
+  yAxisLabel: {
+    fontSize: 8,
+    lineHeight: 10,
+  },
+  chartMainArea: {
+    flex: 1,
+    height: CHART_BAR_HEIGHT,
+    position: 'relative',
+  },
+  gridLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
   },
   chartBarsArea: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'flex-end',
-    height: 160,
-    paddingHorizontal: spacing.xs,
+    height: CHART_BAR_HEIGHT,
   },
   monthGroup: {
     flex: 1,
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: 2,
+  },
+  barTopLabels: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  barTopLabel: {
+    fontSize: 8,
+    lineHeight: 10,
+    textAlign: 'center',
   },
   monthBars: {
     flexDirection: 'row',
@@ -893,24 +1139,29 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   monthBar: {
-    width: 14,
-    borderRadius: 3,
-    minHeight: 2,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    minHeight: 3,
   },
   monthLabel: {
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '500',
     textAlign: 'center',
   },
-  chartSummaryRow: {
+  monthNet: {
+    fontSize: 9,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  chartTotalsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  monthAmounts: {
-    flex: 1,
+  chartTotalItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 1,
   },
 
   // Balance por rubro
