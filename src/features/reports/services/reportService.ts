@@ -56,7 +56,9 @@ function applyFilters(query: any, filters?: ReportFilters) {
     query = query.lte('transaction_date', filters.endDate);
   }
   if (filters?.categoryId) {
-    query = query.eq('category_id', filters.categoryId);
+    query = query.or(
+      `category_id.eq.${filters.categoryId},transfer_to_category_id.eq.${filters.categoryId}`,
+    );
   }
   if (filters?.type) {
     query = query.eq('type', filters.type);

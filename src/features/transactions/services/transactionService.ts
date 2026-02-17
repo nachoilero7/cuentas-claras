@@ -77,7 +77,9 @@ export async function getTransactions(filters?: TransactionFilters) {
     query = query.eq('season_id', filters.seasonId);
   }
   if (filters?.categoryId) {
-    query = query.eq('category_id', filters.categoryId);
+    query = query.or(
+      `category_id.eq.${filters.categoryId},transfer_to_category_id.eq.${filters.categoryId}`,
+    );
   }
   if (filters?.type) {
     query = query.eq('type', filters.type);

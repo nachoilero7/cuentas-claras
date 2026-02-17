@@ -9,16 +9,20 @@ import {
   TextInput,
   Pressable,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Text, FAB } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { startOfWeek, startOfMonth, subMonths, format } from 'date-fns';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useCategories } from '@/src/features/categories/hooks/useCategories';
 import { useTransactions } from '@/src/features/transactions/hooks/useTransactions';
 import type { TransactionWithCategory } from '@/src/features/transactions/services/transactionService';
 import { Card } from '@/src/shared/components/ui/Card';
@@ -103,7 +107,9 @@ function getDateRange(filter: DateFilter): { startDate?: string; endDate?: strin
 export default function TransactionsScreen() {
   const { user } = useAuth();
   const { colors } = useAppTheme();
+  const navigation = useNavigation<BottomTabNavigationProp<Record<string, undefined>>>();
   const { data: profile } = useProfile();
+  const { data: categories } = useCategories();
   const params = useLocalSearchParams<{ categoryId?: string; type?: string }>();
   const [activeFilter, setActiveFilter] = useState<FilterType>(
     (params.type as FilterType) || 'all'
@@ -115,7 +121,19 @@ export default function TransactionsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Sincronizar filtros con params de navegacion (ej: al volver al tab sin params)
+  // Al presionar el tab directamente, limpiar todos los filtros
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      setActiveFilter('all');
+      setActiveDateFilter('all');
+      setActiveCategoryId(undefined);
+      setSearchQuery('');
+      setDebouncedSearch('');
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  // Sincronizar filtros con params de navegacion (ej: desde dashboard con categoryId)
   useEffect(() => {
     setActiveCategoryId(params.categoryId || undefined);
   }, [params.categoryId]);
@@ -133,6 +151,16 @@ export default function TransactionsScreen() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  const activeCategories = useMemo(() => {
+    if (!categories) return [];
+    return categories.filter((c) => c.is_active);
+  }, [categories]);
+
+  const activeCategoryName = useMemo(() => {
+    if (!activeCategoryId || !activeCategories.length) return undefined;
+    return activeCategories.find((c) => c.id === activeCategoryId)?.name;
+  }, [activeCategoryId, activeCategories]);
 
   const role = profile?.role ?? 'viewer';
   const isAdmin = role === 'admin';
@@ -258,20 +286,18 @@ export default function TransactionsScreen() {
             </View>
             <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
           </View>
-          {activeCategoryId && (
-            <View style={styles.categoryChip}>
-              <MaterialCommunityIcons name="tag" size={14} color={colors.primary} />
-              <Text variant="labelSmall" style={{ color: colors.text, fontSize: 12 }}>
-                Filtrando por rubro
-              </Text>
-              <Pressable
-                onPress={() => setActiveCategoryId(undefined)}
-                hitSlop={8}
-                accessibilityLabel="Quitar filtro de rubro"
-                accessibilityRole="button"
-              >
-                <MaterialCommunityIcons name="close-circle" size={16} color={colors.textSecondary} />
-              </Pressable>
+          {activeCategories.length > 0 && (
+            <View style={styles.filterSection}>
+              <View style={styles.filterLabelRow}>
+                <MaterialCommunityIcons name="tag-outline" size={12} color={colors.textTertiary} />
+                <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>Rubro</Text>
+              </View>
+              <CategoryFilterChips
+                categories={activeCategories}
+                activeCategoryId={activeCategoryId}
+                onCategoryChange={setActiveCategoryId}
+                colors={colors}
+              />
             </View>
           )}
         </View>
@@ -284,15 +310,17 @@ export default function TransactionsScreen() {
           }
           title={
             debouncedSearch || activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId
-              ? 'Sin resultados para tu busqueda'
+              ? 'Sin resultados'
               : 'Sin movimientos'
           }
           description={
             debouncedSearch
               ? `No se encontraron movimientos para "${debouncedSearch}".`
-              : activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId
-                ? 'No hay movimientos que coincidan con los filtros aplicados.'
-                : 'Registra tu primer movimiento para empezar a llevar el control de tus finanzas.'
+              : activeCategoryId && activeCategoryName
+                ? `No hay movimientos en el rubro "${activeCategoryName}"${activeFilter !== 'all' ? ` de tipo ${FILTER_CHIPS.find(f => f.key === activeFilter)?.label?.toLowerCase() ?? activeFilter}` : ''}${activeDateFilter !== 'all' ? ` en este periodo` : ''}.`
+                : activeFilter !== 'all' || activeDateFilter !== 'all'
+                  ? 'No hay movimientos que coincidan con los filtros aplicados.'
+                  : 'Registra tu primer movimiento para empezar a llevar el control de tus finanzas.'
           }
           actionLabel={
             (activeFilter !== 'all' || activeDateFilter !== 'all' || activeCategoryId || debouncedSearch)
@@ -395,20 +423,20 @@ export default function TransactionsScreen() {
               </View>
               <DateFilterChips activeFilter={activeDateFilter} onFilterChange={setActiveDateFilter} colors={colors} />
             </View>
-            {activeCategoryId && (
-              <View style={styles.categoryChip}>
-                <MaterialCommunityIcons name="tag" size={14} color={colors.primary} />
-                <Text variant="labelSmall" style={{ color: colors.text, fontSize: 12 }}>
-                  Filtrando por rubro
-                </Text>
-                <Pressable
-                  onPress={() => setActiveCategoryId(undefined)}
-                  hitSlop={8}
-                  accessibilityLabel="Quitar filtro de rubro"
-                  accessibilityRole="button"
-                >
-                  <MaterialCommunityIcons name="close-circle" size={16} color={colors.textSecondary} />
-                </Pressable>
+
+            {/* Filtro de rubro */}
+            {activeCategories.length > 0 && (
+              <View style={styles.filterSection}>
+                <View style={styles.filterLabelRow}>
+                  <MaterialCommunityIcons name="tag-outline" size={12} color={colors.textTertiary} />
+                  <Text variant="labelSmall" style={[styles.filterSectionLabel, { color: colors.textTertiary }]}>Rubro</Text>
+                </View>
+                <CategoryFilterChips
+                  categories={activeCategories}
+                  activeCategoryId={activeCategoryId}
+                  onCategoryChange={setActiveCategoryId}
+                  colors={colors}
+                />
               </View>
             )}
           </View>
@@ -518,6 +546,78 @@ function DateFilterChips({ activeFilter, onFilterChange, colors }: DateFilterChi
         );
       })}
     </View>
+  );
+}
+
+// ── Filtro de chips de rubro ─────────────────────────────────────────────────
+
+interface CategoryFilterChipsProps {
+  categories: { id: string; name: string; color: string | null }[];
+  activeCategoryId: string | undefined;
+  onCategoryChange: (id: string | undefined) => void;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+}
+
+function CategoryFilterChips({ categories, activeCategoryId, onCategoryChange, colors }: CategoryFilterChipsProps) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+      <Pressable
+        onPress={() => onCategoryChange(undefined)}
+        accessibilityLabel={`Rubro: Todos${!activeCategoryId ? ', seleccionado' : ''}`}
+        accessibilityState={{ selected: !activeCategoryId }}
+        accessibilityRole="button"
+        style={[
+          styles.chip,
+          !activeCategoryId
+            ? { backgroundColor: colors.primary }
+            : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
+        ]}
+      >
+        <Text
+          style={[
+            styles.chipText,
+            { color: !activeCategoryId ? colors.onPrimary : colors.textSecondary },
+          ]}
+        >
+          Todos
+        </Text>
+      </Pressable>
+      {categories.map((cat) => {
+        const isActive = activeCategoryId === cat.id;
+        const catColor = cat.color ?? colors.primary;
+        return (
+          <Pressable
+            key={cat.id}
+            onPress={() => onCategoryChange(isActive ? undefined : cat.id)}
+            accessibilityLabel={`Rubro: ${cat.name}${isActive ? ', seleccionado' : ''}`}
+            accessibilityState={{ selected: isActive }}
+            accessibilityRole="button"
+            style={[
+              styles.chip,
+              isActive
+                ? { backgroundColor: catColor }
+                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outline },
+            ]}
+          >
+            {isActive && (
+              <View style={[styles.categoryDot, { backgroundColor: colors.onPrimary }]} />
+            )}
+            {!isActive && cat.color && (
+              <View style={[styles.categoryDot, { backgroundColor: catColor }]} />
+            )}
+            <Text
+              style={[
+                styles.chipText,
+                { color: isActive ? '#FFFFFF' : colors.textSecondary },
+              ]}
+              numberOfLines={1}
+            >
+              {cat.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }
 
@@ -737,27 +837,22 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
+    flexDirection: 'row' as const,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    gap: 5,
   },
   chipText: {
     fontSize: 11,
     fontWeight: '500',
   },
-  categoryChip: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    alignSelf: 'flex-start' as const,
-    gap: 6,
-    marginTop: spacing.xs,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#00000020',
+  categoryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   listContent: {
     padding: spacing.md,
