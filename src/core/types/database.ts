@@ -94,6 +94,7 @@ export interface Transaction {
   description: string;
   notes: string | null;
   payment_method: PaymentMethod | null;
+  destination_alias: string | null;
   category_id: string;
   transfer_to_category_id: string | null;
   transaction_date: string;

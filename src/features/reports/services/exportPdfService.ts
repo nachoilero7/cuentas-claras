@@ -540,6 +540,7 @@ function transactionDetailTable(transactions: ExportTransaction[]): string {
       const statusLabel = STATUS_LABELS[t.status] ?? t.status;
       const bgColor = rowIndex % 2 === 0 ? COLORS.white : COLORS.background;
       const paymentLabel = t.payment_method ? PAYMENT_METHOD_LABELS[t.payment_method] ?? '' : '';
+      const aliasLabel = t.destination_alias ? ` → ${escapeHtml(t.destination_alias)}` : '';
 
       if (t.type === 'income') subtotalIncome += t.amount;
       else if (t.type === 'expense') subtotalExpense += t.amount;
@@ -553,7 +554,7 @@ function transactionDetailTable(transactions: ExportTransaction[]): string {
             </span>
           </td>
           <td style="padding: 7px 10px; font-size: 10px; color: ${COLORS.text};">${escapeHtml(t.description)}</td>
-          <td style="padding: 7px 10px; font-size: 10px; color: ${COLORS.textSecondary};">${paymentLabel}</td>
+          <td style="padding: 7px 10px; font-size: 10px; color: ${COLORS.textSecondary};">${paymentLabel}${aliasLabel}</td>
           <td style="padding: 7px 10px; font-size: 10px; color: ${COLORS.textSecondary};">${escapeHtml(t.created_by_name ?? '')}</td>
           <td style="padding: 7px 10px; font-size: 10px; font-weight: 600; color: ${typeColor}; text-align: right;">
             ${t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}${formatCurrency(t.amount, t.currency)}

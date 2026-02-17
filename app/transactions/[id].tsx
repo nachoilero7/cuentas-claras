@@ -18,7 +18,7 @@ import { z } from 'zod';
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
-import { useProfile } from '@/src/features/auth/hooks/useProfile';
+import { useProfile, useAllProfiles } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
 import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
 import {
@@ -142,6 +142,7 @@ export default function TransactionFormScreen() {
   const createApproval = useCreateApproval();
   const { authenticate } = useBiometric();
   const { data: categoryBalances } = useCategoryBalances();
+  const { data: allProfiles } = useAllProfiles();
 
   // Estado del formulario
   const [type, setType] = useState<TransactionType>('expense');
@@ -154,6 +155,8 @@ export default function TransactionFormScreen() {
   const [transferToCategoryId, setTransferToCategoryId] = useState('');
   const [transactionDate, setTransactionDate] = useState(new Date());
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [destinationAlias, setDestinationAlias] = useState('');
+  const [showAliasSuggestions, setShowAliasSuggestions] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
 
   // Estado de errores
@@ -254,6 +257,7 @@ export default function TransactionFormScreen() {
       setTransferToCategoryId(transaction.transfer_to_category_id ?? '');
       setTransactionDate(new Date(transaction.transaction_date + 'T12:00:00'));
       setPaymentMethod(transaction.payment_method ?? 'cash');
+      setDestinationAlias(transaction.destination_alias ?? '');
     }
   }, [isCreateMode, transaction]);
 
@@ -268,6 +272,26 @@ export default function TransactionFormScreen() {
     if (!categoryId || !categoryBalances) return null;
     return categoryBalances.find((b) => b.category_id === categoryId) ?? null;
   }, [categoryId, categoryBalances]);
+
+  // Sugerencias de alias de miembros del equipo
+  const aliasSuggestions = useMemo(() => {
+    if (!allProfiles) return [];
+    const withAlias = allProfiles
+      .filter((p) => p.payment_alias)
+      .map((p) => ({
+        alias: p.payment_alias!,
+        name: p.display_name || p.full_name,
+      }));
+    if (!destinationAlias.trim()) return withAlias;
+    const search = destinationAlias.toLowerCase();
+    return withAlias.filter(
+      (s) =>
+        s.alias.toLowerCase().includes(search) ||
+        s.name.toLowerCase().includes(search),
+    );
+  }, [allProfiles, destinationAlias]);
+
+  const showAliasField = paymentMethod === 'bank_transfer' || paymentMethod === 'digital_wallet';
 
   // ── Validacion ────────────────────────────────────────────────────────────
 
@@ -378,6 +402,7 @@ export default function TransactionFormScreen() {
       description: description.trim(),
       notes: notes.trim() || null,
       payment_method: paymentMethod,
+      destination_alias: showAliasField && destinationAlias.trim() ? destinationAlias.trim() : null,
       category_id: categoryId,
       transfer_to_category_id: type === 'transfer' ? transferToCategoryId : null,
       transaction_date: dateToISO(transactionDate),
@@ -810,6 +835,52 @@ export default function TransactionFormScreen() {
               </View>
             </View>
 
+            {/* ── Alias/CBU destino (transferencia/billetera) ───────── */}
+            {showAliasField && (
+              <View style={styles.section}>
+                <Input
+                  label="Alias / CBU destino"
+                  value={destinationAlias}
+                  onChangeText={(text) => {
+                    setDestinationAlias(text);
+                    setShowAliasSuggestions(text.length > 0);
+                  }}
+                  onFocus={() => setShowAliasSuggestions(true)}
+                  onBlur={() => {
+                    // Delay para permitir tocar sugerencias
+                    setTimeout(() => setShowAliasSuggestions(false), 200);
+                  }}
+                  placeholder="Ej: mi.alias.mp o CBU/CVU"
+                  leftIcon="bank-transfer"
+                  autoCapitalize="none"
+                />
+                {showAliasSuggestions && aliasSuggestions.length > 0 && (
+                  <View style={[styles.suggestionsContainer, { backgroundColor: colors.surface, borderColor: colors.outline }]}>
+                    {aliasSuggestions.slice(0, 5).map((s) => (
+                      <Pressable
+                        key={s.alias}
+                        style={[styles.suggestionItem, { borderBottomColor: colors.outlineVariant }]}
+                        onPress={() => {
+                          setDestinationAlias(s.alias);
+                          setShowAliasSuggestions(false);
+                        }}
+                      >
+                        <MaterialCommunityIcons name="account-outline" size={16} color={colors.textSecondary} />
+                        <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                          <Text variant="bodySmall" style={{ color: colors.text, fontWeight: '600' }}>
+                            {s.alias}
+                          </Text>
+                          <Text variant="labelSmall" style={{ color: colors.textTertiary }}>
+                            {s.name}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* ── Rubro ──────────────────────────────────────────────── */}
             <View style={styles.section}>
               <Text
@@ -1111,6 +1182,19 @@ const styles = StyleSheet.create({
   },
   categoryChip: {
     borderRadius: 20,
+  },
+  suggestionsContainer: {
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: -spacing.xs,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.smd,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   errorText: {
     marginTop: spacing.xxs,

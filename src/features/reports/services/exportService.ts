@@ -13,6 +13,7 @@ export interface ExportTransaction {
   currency: string;
   status: string;
   payment_method?: string | null;
+  destination_alias?: string | null;
   created_by_name?: string;
   transfer_to_category_name?: string;
 }
@@ -123,6 +124,7 @@ function buildTransactionsSheet(
     'Descripcion',
     'Rubro Origen',
     'Rubro Destino',
+    'Alias Destino',
     'Monto',
     'Moneda',
     'Medio de Pago',
@@ -136,6 +138,7 @@ function buildTransactionsSheet(
     t.description,
     t.category_name,
     t.transfer_to_category_name ?? '',
+    t.destination_alias ?? '',
     t.amount,
     t.currency,
     t.payment_method ? (PAYMENT_METHOD_LABELS[t.payment_method] ?? t.payment_method) : '',
@@ -146,10 +149,10 @@ function buildTransactionsSheet(
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
   // Anchos de columna
-  applyColumnWidths(ws, [14, 16, 36, 20, 20, 16, 10, 22, 20, 14]);
+  applyColumnWidths(ws, [14, 16, 36, 20, 20, 24, 16, 10, 22, 20, 14]);
 
-  // Formato de moneda para la columna Monto (col 5, filas 1..n)
-  applyNumberFormat(ws, 5, 1, rows.length, '#,##0.00');
+  // Formato de moneda para la columna Monto (col 6, filas 1..n)
+  applyNumberFormat(ws, 6, 1, rows.length, '#,##0.00');
 
   // Auto-filtro en el rango de encabezado
   ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: headers.length - 1, r: 0 } }) };

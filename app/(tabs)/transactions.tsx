@@ -614,6 +614,14 @@ const TransactionCard = memo(function TransactionCard({ transaction, colors, onP
                 </Text>
               </View>
             )}
+            {transaction.destination_alias && (
+              <View style={styles.metaItem}>
+                <MaterialCommunityIcons name="arrow-right" size={11} color={colors.textTertiary} />
+                <Text variant="labelSmall" style={{ color: colors.textTertiary, fontSize: 10 }} numberOfLines={1}>
+                  {transaction.destination_alias}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 

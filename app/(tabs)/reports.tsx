@@ -209,6 +209,7 @@ export default function ReportsScreen() {
         currency: t.currency,
         status: t.status,
         payment_method: t.payment_method ?? null,
+        destination_alias: t.destination_alias ?? undefined,
         created_by_name: t.creator?.display_name || t.creator?.full_name || undefined,
         transfer_to_category_name: t.transfer_to_category?.name ?? undefined,
       }));
@@ -244,6 +245,7 @@ export default function ReportsScreen() {
         currency: t.currency,
         status: t.status,
         payment_method: t.payment_method ?? null,
+        destination_alias: t.destination_alias ?? undefined,
         created_by_name: t.creator?.display_name || t.creator?.full_name || undefined,
         transfer_to_category_name: t.transfer_to_category?.name ?? undefined,
       }));
