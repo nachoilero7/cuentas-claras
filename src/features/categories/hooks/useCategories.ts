@@ -5,6 +5,8 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  setFavoriteCategory,
+  unsetFavoriteCategory,
 } from '../services/categoryService';
 import type { Category } from '@/src/core/types/database';
 import type { UpdateCategoryData } from '../services/categoryService';
@@ -209,4 +211,45 @@ export function useDeleteCategory() {
       queryClient.invalidateQueries({ queryKey: ['budget-alerts'] });
     },
   });
+}
+
+// ─── Toggle rubro favorito ──────────────────────────────────────────────────
+
+export function useToggleFavoriteCategory() {
+  const queryClient = useQueryClient();
+  const { executeOrQueue } = useOfflineAware();
+
+  return useMutation({
+    mutationFn: async ({ id, isFavorite }: { id: string; isFavorite: boolean }) => {
+      const { result, queued } = await executeOrQueue(
+        isFavorite ? 'unset_favorite_category' : 'set_favorite_category',
+        { id } as unknown as Record<string, unknown>,
+        async () => {
+          if (isFavorite) {
+            const { error } = await unsetFavoriteCategory(id);
+            if (error) throw error;
+          } else {
+            const { error } = await setFavoriteCategory(id);
+            if (error) throw error;
+          }
+          return null;
+        },
+      );
+      if (queued) return null;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['category'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// ─── Obtener el rubro favorito (derivado de useCategories) ──────────────────
+
+export function useFavoriteCategory(seasonId?: string) {
+  const { data: categories, ...rest } = useCategories(seasonId);
+  const favorite = categories?.find((c) => c.is_favorite) ?? null;
+  return { data: favorite, ...rest };
 }

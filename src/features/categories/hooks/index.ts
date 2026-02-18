@@ -4,4 +4,6 @@ export {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
+  useToggleFavoriteCategory,
+  useFavoriteCategory,
 } from './useCategories';

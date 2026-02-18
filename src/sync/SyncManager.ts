@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { getOfflineQueue, dequeueMutation, incrementRetryCount } from './offlineQueue';
 import { persistQueryCache } from './queryPersister';
 import { createTransaction, updateTransaction, deleteTransaction } from '@/src/features/transactions/services/transactionService';
-import { createCategory, updateCategory, deleteCategory } from '@/src/features/categories/services/categoryService';
+import { createCategory, updateCategory, deleteCategory, setFavoriteCategory, unsetFavoriteCategory } from '@/src/features/categories/services/categoryService';
 import { createSeason, updateSeason, deleteSeason } from '@/src/features/seasons/services/seasonService';
 import { approveRequest, rejectRequest } from '@/src/features/approvals/services/approvalService';
 import { createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction } from '@/src/features/recurring/services';
@@ -25,6 +25,8 @@ const MUTATION_DESCRIPTIONS: Record<OfflineMutation['type'], string> = {
   create_category: 'crear rubro',
   update_category: 'actualizar rubro',
   delete_category: 'eliminar rubro',
+  set_favorite_category: 'marcar rubro favorito',
+  unset_favorite_category: 'quitar rubro favorito',
   create_season: 'crear temporada',
   update_season: 'actualizar temporada',
   delete_season: 'eliminar temporada',
@@ -51,6 +53,8 @@ const MUTATION_QUERY_KEYS: Record<string, string[][]> = {
   create_category: [['categories']],
   update_category: [['categories'], ...FINANCIAL_KEYS, ['budget-alerts']],
   delete_category: [['categories'], ...FINANCIAL_KEYS, ['budget-alerts']],
+  set_favorite_category: [['categories'], ['dashboard']],
+  unset_favorite_category: [['categories'], ['dashboard']],
   create_season: [['seasons']],
   update_season: [['seasons']],
   delete_season: [['seasons'], ['current-season'], ['categories'], ...FINANCIAL_KEYS, ['recurring'], ['budget-alerts'], ['approvals']],
@@ -92,6 +96,14 @@ async function processMutation(mutation: OfflineMutation): Promise<boolean> {
       }
       case 'delete_category': {
         const { error } = await deleteCategory(mutation.payload.id as string);
+        return !error;
+      }
+      case 'set_favorite_category': {
+        const { error } = await setFavoriteCategory(mutation.payload.id as string);
+        return !error;
+      }
+      case 'unset_favorite_category': {
+        const { error } = await unsetFavoriteCategory(mutation.payload.id as string);
         return !error;
       }
       case 'create_season': {

@@ -103,6 +103,24 @@ export async function deleteCategory(id: string) {
   return { data: data as Category | null, error };
 }
 
+// ─── Marcar rubro como favorito (atomico: desactiva el anterior) ─────────────
+
+export async function setFavoriteCategory(categoryId: string) {
+  const { error } = await supabase.rpc('set_favorite_category', {
+    p_category_id: categoryId,
+  });
+  return { error };
+}
+
+// ─── Quitar rubro favorito ──────────────────────────────────────────────────
+
+export async function unsetFavoriteCategory(categoryId: string) {
+  const { error } = await supabase.rpc('unset_favorite_category', {
+    p_category_id: categoryId,
+  });
+  return { error };
+}
+
 // ─── Eliminar categoria permanentemente ─────────────────────────────────────
 
 export async function hardDeleteCategory(id: string) {

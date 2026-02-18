@@ -59,6 +59,7 @@ export interface Category {
   budget_limit_ars: number | null;
   budget_limit_usd: number | null;
   is_active: boolean;
+  is_favorite: boolean;
   sort_order: number;
   season_id: string | null;
   parent_category_id: string | null;

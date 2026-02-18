@@ -12,6 +12,7 @@ export interface OfflineMutation {
   type:
     | 'create_transaction' | 'update_transaction' | 'delete_transaction'
     | 'create_category' | 'update_category' | 'delete_category'
+    | 'set_favorite_category' | 'unset_favorite_category'
     | 'create_season' | 'update_season' | 'delete_season'
     | 'approve_request' | 'reject_request'
     | 'create_recurring' | 'update_recurring' | 'delete_recurring'

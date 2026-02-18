@@ -26,6 +26,7 @@ import {
   useMonthlyBreakdown,
   useCategoryBalances,
 } from '@/src/features/dashboard/hooks/useDashboard';
+import { useFavoriteCategory } from '@/src/features/categories/hooks/useCategories';
 import { useRecurringTransactions } from '@/src/features/recurring/hooks/useRecurring';
 import { useBudgetStatus } from '@/src/features/budget/hooks/useBudgetAlerts';
 import { formatCurrency } from '@/src/core/utils/currency';
@@ -264,6 +265,9 @@ export default function DashboardScreen() {
   const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyBreakdown(currentSeason?.id);
   const { data: categoryBalances, isLoading: categoryLoading } = useCategoryBalances(currentSeason?.id);
 
+  // Rubro favorito
+  const { data: favoriteCategory } = useFavoriteCategory();
+
   // Datos de recurrentes y presupuestos para indicadores
   const { data: recurringData } = useRecurringTransactions();
   const { data: budgetStatuses } = useBudgetStatus();
@@ -288,6 +292,7 @@ export default function DashboardScreen() {
     setRefreshing(true);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      queryClient.invalidateQueries({ queryKey: ['categories'] }),
       queryClient.invalidateQueries({ queryKey: ['current-season'] }),
       queryClient.invalidateQueries({ queryKey: ['recurring'] }),
       queryClient.invalidateQueries({ queryKey: ['budget-status'] }),
@@ -308,6 +313,12 @@ export default function DashboardScreen() {
     if (activeBalances.length === 0) return 0;
     return Math.max(...activeBalances.map((b) => Math.abs(b.balance_ars)), 1);
   }, [activeBalances]);
+
+  // Balance del rubro favorito (cruzar con categoryBalances)
+  const favoriteBalance = useMemo(() => {
+    if (!favoriteCategory || !categoryBalances) return null;
+    return categoryBalances.find((b) => b.category_id === favoriteCategory.id) ?? null;
+  }, [favoriteCategory, categoryBalances]);
 
   // Valor maximo para escala del grafico mensual
   const monthlyMax = useMemo(() => {
@@ -438,6 +449,104 @@ export default function DashboardScreen() {
               textTertiary={colors.textTertiary}
             />
           </Card>
+
+          {/* ── Rubro favorito (si existe) ──────────────────────────── */}
+          {favoriteCategory && (
+            <Card variant="elevated" padding="md" style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons
+                  name="star"
+                  size={22}
+                  color="#F59E0B"
+                />
+                <Text
+                  variant="titleMedium"
+                  style={[styles.sectionTitle, { color: colors.text }]}
+                >
+                  {favoriteCategory.name}
+                </Text>
+              </View>
+
+              {favoriteBalance ? (
+                <View style={{ gap: spacing.sm }}>
+                  <Text
+                    variant="headlineMedium"
+                    style={{
+                      color: favoriteBalance.balance_ars >= 0 ? colors.income : colors.expense,
+                      fontWeight: '700',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {formatCurrency(favoriteBalance.balance_ars)}
+                  </Text>
+
+                  <View style={{ gap: spacing.xs }}>
+                    <View style={styles.favoriteDetailRow}>
+                      <MaterialCommunityIcons name="trending-up" size={14} color={colors.income} />
+                      <Text variant="bodySmall" style={{ color: colors.textSecondary, flex: 1 }}>
+                        Ingresos
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: colors.income, fontWeight: '600' }}>
+                        +{formatCurrency(favoriteBalance.total_income_ars)}
+                      </Text>
+                    </View>
+                    <View style={styles.favoriteDetailRow}>
+                      <MaterialCommunityIcons name="trending-down" size={14} color={colors.expense} />
+                      <Text variant="bodySmall" style={{ color: colors.textSecondary, flex: 1 }}>
+                        Egresos
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: colors.expense, fontWeight: '600' }}>
+                        -{formatCurrency(favoriteBalance.total_expenses_ars)}
+                      </Text>
+                    </View>
+                    {favoriteBalance.net_transfers_ars !== 0 && (
+                      <View style={styles.favoriteDetailRow}>
+                        <MaterialCommunityIcons
+                          name="swap-horizontal"
+                          size={14}
+                          color={favoriteBalance.net_transfers_ars >= 0 ? colors.income : colors.expense}
+                        />
+                        <Text variant="bodySmall" style={{ color: colors.textSecondary, flex: 1 }}>
+                          Transferencias
+                        </Text>
+                        <Text
+                          variant="bodySmall"
+                          style={{
+                            color: favoriteBalance.net_transfers_ars >= 0 ? colors.income : colors.expense,
+                            fontWeight: '600',
+                          }}
+                        >
+                          {favoriteBalance.net_transfers_ars >= 0 ? '+' : ''}
+                          {formatCurrency(favoriteBalance.net_transfers_ars)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <Pressable
+                    style={styles.favoriteAction}
+                    onPress={() => router.push({
+                      pathname: '/(tabs)/transactions',
+                      params: { categoryId: favoriteCategory.id },
+                    })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver movimientos de ${favoriteCategory.name}`}
+                  >
+                    <Text variant="labelMedium" style={{ color: colors.primary }}>
+                      Ver {favoriteBalance.transaction_count} movimiento{favoriteBalance.transaction_count !== 1 ? 's' : ''}
+                    </Text>
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={colors.primary} />
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                    Sin movimientos en este rubro
+                  </Text>
+                </View>
+              )}
+            </Card>
+          )}
 
           {/* ── Fila secundaria: contadores ──────────────────────────── */}
           <View style={styles.countersRow}>
@@ -1179,6 +1288,22 @@ const styles = StyleSheet.create({
   chartTotalItem: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+
+  // Rubro favorito
+  favoriteDetailRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+  },
+  favoriteAction: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 4,
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#00000015',
   },
 
   // Balance por rubro

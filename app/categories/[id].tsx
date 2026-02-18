@@ -25,6 +25,7 @@ import {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
+  useToggleFavoriteCategory,
 } from '@/src/features/categories/hooks/useCategories';
 import { useCurrentSeason } from '@/src/features/seasons/hooks/useSeasons';
 import { useCategoryBalances } from '@/src/features/dashboard/hooks/useDashboard';
@@ -83,6 +84,7 @@ export default function CategoryFormScreen() {
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
+  const toggleFavorite = useToggleFavoriteCategory();
 
   // Balance de esta categoria (solo en edicion)
   const balance = useMemo(() => {
@@ -101,6 +103,7 @@ export default function CategoryFormScreen() {
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('');
   const [color, setColor] = useState('');
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Estado de errores
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -161,6 +164,7 @@ export default function CategoryFormScreen() {
       setDescription(category.description ?? '');
       setIcon(category.icon ?? '');
       setColor(category.color ?? '');
+      setIsFavorite(category.is_favorite ?? false);
     }
   }, [isCreateMode, category]);
 
@@ -258,6 +262,22 @@ export default function CategoryFormScreen() {
       ]
     );
   }, [id, deleteCategory]);
+
+  // ── Toggle favorito ────────────────────────────────────────────────────────
+
+  const handleToggleFavorite = useCallback(async () => {
+    try {
+      await toggleFavorite.mutateAsync({ id: id!, isFavorite });
+      setIsFavorite(!isFavorite);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showSnackbar(
+        isFavorite ? 'Se quito el rubro de favoritos' : 'Rubro marcado como favorito',
+        'success',
+      );
+    } catch {
+      // El error se muestra globalmente via MutationCache.onError
+    }
+  }, [id, isFavorite, toggleFavorite]);
 
   // ── Determinar si el formulario esta cargando ──────────────────────────────
 
@@ -401,6 +421,36 @@ export default function CategoryFormScreen() {
                 <MaterialCommunityIcons name="chevron-right" size={18} color={colors.primary} />
               </Pressable>
             </View>
+          )}
+
+          {/* ── Toggle favorito (solo edicion + admin) ──────────────────── */}
+          {!isCreateMode && isAdmin && (
+            <Pressable
+              style={[styles.favoriteRow, { backgroundColor: colors.surface }]}
+              onPress={handleToggleFavorite}
+              disabled={toggleFavorite.isPending}
+              accessibilityRole="button"
+              accessibilityLabel={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+            >
+              <MaterialCommunityIcons
+                name={isFavorite ? 'star' : 'star-outline'}
+                size={24}
+                color={isFavorite ? '#F59E0B' : colors.textSecondary}
+              />
+              <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                <Text variant="bodyMedium" style={{ color: colors.text, fontWeight: '500' }}>
+                  {isFavorite ? 'Rubro favorito' : 'Marcar como favorito'}
+                </Text>
+                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                  {isFavorite
+                    ? 'Se muestra destacado en el inicio'
+                    : 'Se mostrara destacado en el inicio'}
+                </Text>
+              </View>
+              {toggleFavorite.isPending && (
+                <ActivityIndicator size="small" color={colors.primary} />
+              )}
+            </Pressable>
           )}
 
           {/* ── Tarjeta de formulario ──────────────────────────────────── */}
@@ -566,6 +616,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+
+  // Favorito
+  favoriteRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    borderRadius: 16,
+    padding: spacing.lg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
 
   // Formulario
