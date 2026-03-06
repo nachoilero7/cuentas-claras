@@ -5,7 +5,6 @@ import {
   View,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Platform,
 } from 'react-native';
@@ -14,6 +13,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { SkeletonList } from '@/src/shared/components/feedback/SkeletonList';
+import { AnimatedStaggerItem } from '@/src/shared/components/animated/AnimatedStaggerItem';
 import { sanitizeErrorMessage } from '@/src/core/utils/errorMessages';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
@@ -53,13 +54,7 @@ export default function CategoriesScreen() {
   if (isLoading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text
-          variant="bodyMedium"
-          style={[styles.loadingText, { color: colors.textSecondary }]}
-        >
-          Cargando rubros...
-        </Text>
+        <SkeletonList count={5} variant="category" />
       </View>
     );
   }
@@ -130,12 +125,14 @@ export default function CategoriesScreen() {
             tintColor={colors.primary}
           />
         }
-        renderItem={({ item }) => (
-          <CategoryCard
-            category={item}
-            colors={colors}
-            onPress={() => handleNavigateToEdit(item.id)}
-          />
+        renderItem={({ item, index }) => (
+          <AnimatedStaggerItem index={index}>
+            <CategoryCard
+              category={item}
+              colors={colors}
+              onPress={() => handleNavigateToEdit(item.id)}
+            />
+          </AnimatedStaggerItem>
         )}
         ItemSeparatorComponent={ItemSeparator}
       />

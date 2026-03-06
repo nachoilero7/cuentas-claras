@@ -5,13 +5,14 @@
  * predefinidos para mantener consistencia en toda la aplicacion.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Button as PaperButton, useTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 
 import { borderRadius, componentHeight, spacing } from '@/src/shared/theme/spacing';
 import { typography, fontWeight } from '@/src/shared/theme/typography';
+import { hapticLight, hapticMedium } from '@/src/shared/lib/haptics';
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
@@ -150,10 +151,19 @@ export function Button({
   const colors = getButtonColors(variant, theme);
   const sizeStyles = getSizeStyles(size);
 
+  const handlePress = useCallback(() => {
+    if (variant === 'primary') {
+      hapticMedium();
+    } else {
+      hapticLight();
+    }
+    onPress?.();
+  }, [variant, onPress]);
+
   return (
     <PaperButton
       mode={mode}
-      onPress={onPress}
+      onPress={onPress ? handlePress : undefined}
       loading={loading}
       disabled={disabled || loading}
       icon={icon}

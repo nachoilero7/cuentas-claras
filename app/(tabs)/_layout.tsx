@@ -4,6 +4,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
 import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { hapticLight } from '@/src/shared/lib/haptics';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useUnreadCount } from '@/src/features/budget/hooks';
 import { useRecurringExecution } from '@/src/features/recurring/hooks/useRecurringExecution';
@@ -120,6 +121,7 @@ export default function TabsLayout() {
         },
         headerTintColor: colors.onPrimary,
         headerTitleStyle: {
+          fontFamily: 'Inter-SemiBold',
           fontWeight: '600',
         },
         tabBarStyle: {
@@ -133,6 +135,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {
+          fontFamily: 'Inter-Medium',
           fontSize: 11,
           fontWeight: '500',
         },
@@ -142,6 +145,9 @@ export default function TabsLayout() {
         <Tabs.Screen
           key={tab.name}
           name={tab.name}
+          listeners={{
+            tabPress: () => hapticLight(),
+          }}
           options={{
             title: tab.title,
             tabBarIcon: ({ color, focused, size }) => (

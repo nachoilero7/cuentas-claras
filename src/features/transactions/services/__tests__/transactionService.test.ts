@@ -89,11 +89,13 @@ describe('transactionService', () => {
       expect(chain.eq).toHaveBeenCalledWith('season_id', 'season-1');
     });
 
-    it('aplica filtro de categoryId', async () => {
+    it('aplica filtro de categoryId (incluye transferencias)', async () => {
       const chain = setupChainedQuery({ data: [], error: null });
 
       await getTransactions({ categoryId: 'cat-1' });
-      expect(chain.eq).toHaveBeenCalledWith('category_id', 'cat-1');
+      expect(chain.or).toHaveBeenCalledWith(
+        'category_id.eq.cat-1,transfer_to_category_id.eq.cat-1'
+      );
     });
 
     it('aplica filtro de tipo', async () => {

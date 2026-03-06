@@ -10,12 +10,13 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
-import { Text, ActivityIndicator, Chip } from 'react-native-paper';
+import { Text, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { useAllUsers } from '@/src/features/users/hooks/useUsers';
+import { SkeletonList } from '@/src/shared/components/feedback/SkeletonList';
 import { spacing, borderRadius } from '@/src/shared/theme';
 import { USER_ROLE_LABELS } from '@/src/core/config/constants';
 import type { Profile, UserRole } from '@/src/core/types/database';
@@ -353,13 +354,7 @@ export default function MembersTab() {
     if (isLoading) {
       return (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text
-            variant="bodyMedium"
-            style={{ color: colors.textSecondary, marginTop: spacing.md }}
-          >
-            Cargando miembros...
-          </Text>
+          <SkeletonList count={5} variant="member" />
         </View>
       );
     }

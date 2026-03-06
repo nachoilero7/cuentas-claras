@@ -5,12 +5,13 @@
  * y opciones de padding consistentes.
  */
 
-import React from 'react';
-import { StyleSheet, ViewStyle } from 'react-native';
+import React, { useCallback } from 'react';
+import { Platform, StyleSheet, ViewStyle } from 'react-native';
 import { Card as PaperCard, useTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 
 import { borderRadius, spacing } from '@/src/shared/theme/spacing';
+import { hapticLight } from '@/src/shared/lib/haptics';
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
 export type CardVariant = 'elevated' | 'outlined' | 'filled';
@@ -61,15 +62,33 @@ function getPaddingValue(padding: CardPadding): number {
 }
 
 function getCardStyle(variant: CardVariant, theme: MD3Theme): ViewStyle {
+  const isDark = theme.dark;
+
   switch (variant) {
     case 'elevated':
       return {
         backgroundColor: theme.colors.surface,
-        elevation: 2,
-        shadowColor: theme.colors.shadow,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
+        ...Platform.select({
+          ios: {
+            shadowColor: isDark ? '#000000' : '#1a1a1a',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDark ? 0.3 : 0.08,
+            shadowRadius: 8,
+          },
+          android: {
+            elevation: 3,
+          },
+          default: {
+            elevation: 2,
+          },
+        }),
+        // Borde sutil superior en dark mode para efecto de profundidad
+        ...(isDark
+          ? {
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: 'rgba(255,255,255,0.06)',
+            }
+          : {}),
       };
     case 'outlined':
       return {
@@ -77,6 +96,16 @@ function getCardStyle(variant: CardVariant, theme: MD3Theme): ViewStyle {
         borderColor: theme.colors.outlineVariant,
         borderWidth: 1,
         elevation: 0,
+        // Sombra sutil en iOS para mas profundidad
+        ...Platform.select({
+          ios: {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 2,
+          },
+          default: {},
+        }),
       };
     case 'filled':
       return {
@@ -102,6 +131,13 @@ export function Card({
   const cardStyle = getCardStyle(variant, theme);
   const paddingValue = getPaddingValue(padding);
 
+  const handlePress = useCallback(() => {
+    if (onPress) {
+      hapticLight();
+      onPress();
+    }
+  }, [onPress]);
+
   const content = (
     <PaperCard.Content style={{ padding: paddingValue }}>
       {children}
@@ -111,7 +147,7 @@ export function Card({
   return (
     <PaperCard
       mode={mode}
-      onPress={onPress}
+      onPress={onPress ? handlePress : undefined}
       disabled={disabled}
       style={[
         styles.card,

@@ -4,7 +4,6 @@ import {
   View,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   TextInput,
   Pressable,
@@ -28,6 +27,8 @@ import type { TransactionWithCategory } from '@/src/features/transactions/servic
 import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
 import { EmptyState } from '@/src/shared/components/feedback/EmptyState';
+import { SkeletonList } from '@/src/shared/components/feedback/SkeletonList';
+import { AnimatedStaggerItem } from '@/src/shared/components/animated/AnimatedStaggerItem';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { formatDate } from '@/src/core/utils/date';
 import { TRANSACTION_TYPE_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_ICONS } from '@/src/core/config/constants';
@@ -206,12 +207,14 @@ export default function TransactionsScreen() {
   }, []);
 
   const renderTransaction = useCallback(
-    ({ item }: { item: TransactionWithCategory }) => (
-      <TransactionCard
-        transaction={item}
-        colors={colors}
-        onPress={() => handleNavigateToDetail(item.id)}
-      />
+    ({ item, index }: { item: TransactionWithCategory; index: number }) => (
+      <AnimatedStaggerItem index={index}>
+        <TransactionCard
+          transaction={item}
+          colors={colors}
+          onPress={() => handleNavigateToDetail(item.id)}
+        />
+      </AnimatedStaggerItem>
     ),
     [colors, handleNavigateToDetail],
   );
@@ -225,13 +228,7 @@ export default function TransactionsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text
-          variant="bodyMedium"
-          style={[styles.loadingText, { color: colors.textSecondary }]}
-        >
-          Cargando movimientos...
-        </Text>
+        <SkeletonList count={6} variant="transaction" />
       </View>
     );
   }

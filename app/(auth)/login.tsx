@@ -18,6 +18,7 @@ import { useAuth } from '@/src/core/providers/AuthProvider';
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
 import { Input } from '@/src/shared/components/ui/Input';
 import { Button } from '@/src/shared/components/ui/Button';
+import { AnimatedFadeIn } from '@/src/shared/components/animated/AnimatedFadeIn';
 import { spacing } from '@/src/shared/theme';
 import { APP_NAME } from '@/src/core/config/constants';
 
@@ -92,22 +93,25 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Encabezado / Logo ──────────────────────────────────────── */}
-          <View style={styles.header}>
-            <Text
-              variant="displaySmall"
-              style={[styles.appName, { color: colors.primary }]}
-            >
-              {APP_NAME}
-            </Text>
-            <Text
-              variant="bodyMedium"
-              style={[styles.subtitle, { color: colors.textSecondary }]}
-            >
-              Gestion financiera simple y transparente
-            </Text>
-          </View>
+          <AnimatedFadeIn delay={0} direction="down">
+            <View style={styles.header}>
+              <Text
+                variant="displaySmall"
+                style={[styles.appName, { color: colors.primary }]}
+              >
+                {APP_NAME}
+              </Text>
+              <Text
+                variant="bodyMedium"
+                style={[styles.subtitle, { color: colors.textSecondary }]}
+              >
+                Gestion financiera simple y transparente
+              </Text>
+            </View>
+          </AnimatedFadeIn>
 
           {/* ── Formulario ────────────────────────────────────────────── */}
+          <AnimatedFadeIn delay={200}>
           <View style={[styles.form, { backgroundColor: colors.surface }]}>
             <Text
               variant="headlineSmall"
@@ -204,6 +208,7 @@ export default function LoginScreen() {
               Olvidaste tu contrasena?
             </Text>
           </View>
+          </AnimatedFadeIn>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

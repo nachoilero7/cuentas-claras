@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  ActivityIndicator,
   Pressable,
   Image,
 } from 'react-native';
@@ -32,6 +31,9 @@ import { useBudgetStatus } from '@/src/features/budget/hooks/useBudgetAlerts';
 import { formatCurrency } from '@/src/core/utils/currency';
 import { Card } from '@/src/shared/components/ui/Card';
 import { Button } from '@/src/shared/components/ui/Button';
+import { AnimatedFadeIn } from '@/src/shared/components/animated/AnimatedFadeIn';
+import { SkeletonDashboard } from '@/src/shared/components/feedback/SkeletonDashboard';
+import { Skeleton } from '@/src/shared/components/feedback/Skeleton';
 import { spacing, borderRadius } from '@/src/shared/theme/spacing';
 
 // ── Constantes del grafico ────────────────────────────────────────────────────
@@ -351,13 +353,7 @@ export default function DashboardScreen() {
   if (summaryLoading && !summary) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text
-          variant="bodyMedium"
-          style={{ color: colors.textSecondary, marginTop: spacing.md }}
-        >
-          Cargando dashboard...
-        </Text>
+        <SkeletonDashboard />
       </View>
     );
   }
@@ -377,37 +373,39 @@ export default function DashboardScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* ── Encabezado de bienvenida ──────────────────────────────────────── */}
-      <View style={styles.welcomeSection}>
-        <View style={styles.welcomeRow}>
-          <View style={styles.welcomeTextContainer}>
-            <Text
-              variant="headlineSmall"
-              style={[styles.greeting, { color: colors.text }]}
-            >
-              Hola, {displayName}!
-            </Text>
-            <Text
-              variant="bodySmall"
-              style={{ color: colors.textSecondary }}
-            >
-              {currentDate}
-            </Text>
-            <Text
-              variant="bodySmall"
-              style={{ color: colors.textSecondary, marginTop: spacing.xxs }}
-            >
-              Temporada: {currentSeason?.name ?? 'Sin temporada activa'}
-            </Text>
-          </View>
-          <View style={styles.welcomeLogoContainer}>
-            <Image
-              source={require('@/assets/images/logo.png')}
-              style={styles.welcomeLogo}
-              resizeMode="cover"
-            />
+      <AnimatedFadeIn delay={0} direction="down">
+        <View style={styles.welcomeSection}>
+          <View style={styles.welcomeRow}>
+            <View style={styles.welcomeTextContainer}>
+              <Text
+                variant="headlineSmall"
+                style={[styles.greeting, { color: colors.text }]}
+              >
+                Hola, {displayName}!
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: colors.textSecondary }}
+              >
+                {currentDate}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: colors.textSecondary, marginTop: spacing.xxs }}
+              >
+                Temporada: {currentSeason?.name ?? 'Sin temporada activa'}
+              </Text>
+            </View>
+            <View style={styles.welcomeLogoContainer}>
+              <Image
+                source={require('@/assets/images/logo.png')}
+                style={styles.welcomeLogo}
+                resizeMode="cover"
+              />
+            </View>
           </View>
         </View>
-      </View>
+      </AnimatedFadeIn>
 
       {/* ── Contenido para administradores (datos financieros completos) ── */}
       {isAdmin && (
@@ -432,26 +430,29 @@ export default function DashboardScreen() {
           )}
 
           {/* ── Donut de resumen ─────────────────────────────────────── */}
-          <Card variant="elevated" padding="md" style={styles.sectionCard}>
-            <DonutSummary
-              income={summary?.total_income_ars ?? 0}
-              expenses={summary?.total_expenses_ars ?? 0}
-              incomeUsd={summary?.total_income_usd ?? 0}
-              expensesUsd={summary?.total_expenses_usd ?? 0}
-              balance={summary?.net_balance_ars ?? 0}
-              balanceUsd={summary?.net_balance_usd ?? 0}
-              incomeColor={colors.income}
-              expenseColor={colors.expense}
-              balanceColor={balanceColor}
-              surfaceColor={colors.outlineVariant + '40'}
-              textColor={colors.text}
-              textSecondary={colors.textSecondary}
-              textTertiary={colors.textTertiary}
-            />
-          </Card>
+          <AnimatedFadeIn delay={100}>
+            <Card variant="elevated" padding="md" style={styles.sectionCard}>
+              <DonutSummary
+                income={summary?.total_income_ars ?? 0}
+                expenses={summary?.total_expenses_ars ?? 0}
+                incomeUsd={summary?.total_income_usd ?? 0}
+                expensesUsd={summary?.total_expenses_usd ?? 0}
+                balance={summary?.net_balance_ars ?? 0}
+                balanceUsd={summary?.net_balance_usd ?? 0}
+                incomeColor={colors.income}
+                expenseColor={colors.expense}
+                balanceColor={balanceColor}
+                surfaceColor={colors.outlineVariant + '40'}
+                textColor={colors.text}
+                textSecondary={colors.textSecondary}
+                textTertiary={colors.textTertiary}
+              />
+            </Card>
+          </AnimatedFadeIn>
 
           {/* ── Rubro favorito (si existe) ──────────────────────────── */}
           {favoriteCategory && (
+            <AnimatedFadeIn delay={150}>
             <Card variant="elevated" padding="md" style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons
@@ -546,9 +547,11 @@ export default function DashboardScreen() {
                 </View>
               )}
             </Card>
+            </AnimatedFadeIn>
           )}
 
           {/* ── Fila secundaria: contadores ──────────────────────────── */}
+          <AnimatedFadeIn delay={200}>
           <View style={styles.countersRow}>
             <View style={[styles.counterChip, { backgroundColor: colors.surface }]}>
               <MaterialCommunityIcons
@@ -655,8 +658,10 @@ export default function DashboardScreen() {
               </Text>
             </Pressable>
           </View>
+          </AnimatedFadeIn>
 
           {/* ── Grafico mensual: Ingresos vs Egresos ─────────────────── */}
+          <AnimatedFadeIn delay={250}>
           <Card variant="elevated" padding="md" style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons
@@ -702,7 +707,7 @@ export default function DashboardScreen() {
 
             {monthlyLoading ? (
               <View style={styles.chartLoading}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <Skeleton width="100%" height={CHART_BAR_HEIGHT} borderRadius={8} />
               </View>
             ) : !monthlyData || monthlyData.length === 0 ? (
               <View style={styles.emptyState}>
@@ -870,8 +875,10 @@ export default function DashboardScreen() {
               </View>
             )}
           </Card>
+          </AnimatedFadeIn>
 
           {/* ── Balance por rubro ──────────────────────────────────────── */}
+          <AnimatedFadeIn delay={300}>
           <Card variant="elevated" padding="md" style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <MaterialCommunityIcons
@@ -889,7 +896,7 @@ export default function DashboardScreen() {
 
             {categoryLoading ? (
               <View style={styles.chartLoading}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <Skeleton width="100%" height={100} borderRadius={8} />
               </View>
             ) : activeBalances.length === 0 ? (
               <View style={styles.emptyState}>
@@ -984,6 +991,7 @@ export default function DashboardScreen() {
               </View>
             )}
           </Card>
+          </AnimatedFadeIn>
 
           {/* ── Acciones rapidas (admin) ──────────────────────────────── */}
           <View style={styles.quickActions}>

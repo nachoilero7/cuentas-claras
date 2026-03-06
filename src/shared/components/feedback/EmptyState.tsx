@@ -8,10 +8,11 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { Text, Icon, useTheme } from 'react-native-paper';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { Button } from '@/src/shared/components/ui/Button';
 import { spacing } from '@/src/shared/theme/spacing';
-import { typography, fontWeight } from '@/src/shared/theme/typography';
+import { typography, fontWeight, fontFamily } from '@/src/shared/theme/typography';
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
 export interface EmptyStateProps {
@@ -50,23 +51,32 @@ export function EmptyState({
   const theme = useTheme();
 
   return (
-    <View
+    <Animated.View
+      entering={FadeInUp.duration(400).springify()}
       style={[styles.container, style]}
       className={className}
       testID={testID}
     >
-      {/* Icono */}
-      <View
-        style={[
-          styles.iconContainer,
-          { backgroundColor: theme.colors.surfaceVariant },
-        ]}
-      >
-        <Icon
-          source={icon}
-          size={iconSize}
-          color={theme.colors.onSurfaceVariant}
+      {/* Icono con doble circulo decorativo */}
+      <View style={styles.iconWrapper}>
+        <View
+          style={[
+            styles.iconRingOuter,
+            { backgroundColor: theme.colors.primary + '08' },
+          ]}
         />
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: theme.colors.primary + '15' },
+          ]}
+        >
+          <Icon
+            source={icon}
+            size={iconSize}
+            color={theme.colors.primary + '90'}
+          />
+        </View>
       </View>
 
       {/* Titulo */}
@@ -91,6 +101,13 @@ export function EmptyState({
         </Text>
       ) : null}
 
+      {/* Puntos decorativos */}
+      <View style={styles.dotsRow}>
+        <View style={[styles.dot, { backgroundColor: theme.colors.outlineVariant }]} />
+        <View style={[styles.dot, { backgroundColor: theme.colors.outlineVariant }]} />
+        <View style={[styles.dot, { backgroundColor: theme.colors.outlineVariant }]} />
+      </View>
+
       {/* Boton de accion */}
       {actionLabel && onAction ? (
         <View style={styles.actionContainer}>
@@ -104,7 +121,7 @@ export function EmptyState({
           </Button>
         </View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -116,17 +133,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
   },
+  iconWrapper: {
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconRingOuter: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+  },
   iconContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
   },
   title: {
     fontSize: typography.title.fontSize,
     lineHeight: typography.title.lineHeight,
+    fontFamily: fontFamily.semibold,
     fontWeight: fontWeight.semibold,
     textAlign: 'center',
     marginBottom: spacing.sm,
@@ -134,10 +162,21 @@ const styles = StyleSheet.create({
   description: {
     fontSize: typography.body1.fontSize,
     lineHeight: typography.body1.lineHeight,
+    fontFamily: fontFamily.regular,
     fontWeight: fontWeight.regular,
     textAlign: 'center',
     maxWidth: 280,
+    marginBottom: spacing.md,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
     marginBottom: spacing.lg,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
   actionContainer: {
     marginTop: spacing.sm,

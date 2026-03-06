@@ -1,10 +1,11 @@
 export { ErrorBoundary } from '@/src/shared/components/feedback/RouteErrorBoundary';
 import { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput, Alert, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAppTheme } from '@/src/core/providers/ThemeProvider';
+import { Skeleton } from '@/src/shared/components/feedback/Skeleton';
 import { useProfile } from '@/src/features/auth/hooks/useProfile';
 import { useCategories } from '@/src/features/categories/hooks/useCategories';
 import { usePersistedState } from '@/src/shared/hooks/usePersistedState';
@@ -541,10 +542,11 @@ export default function ReportsScreen() {
 
         {summaryLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: spacing.xs }}>
-              Calculando resumen...
-            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Skeleton width="32%" height={72} borderRadius={12} delay={0} />
+              <Skeleton width="32%" height={72} borderRadius={12} delay={100} />
+              <Skeleton width="32%" height={72} borderRadius={12} delay={200} />
+            </View>
           </View>
         ) : summaryError ? (
           <Card variant="outlined" padding="md">
@@ -649,10 +651,9 @@ export default function ReportsScreen() {
 
         {categoryLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: spacing.xs }}>
-              Cargando desglose...
-            </Text>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} width="100%" height={56} borderRadius={12} delay={i * 100} style={{ marginBottom: 8 }} />
+            ))}
           </View>
         ) : !categoryReport || categoryReport.length === 0 ? (
           <Card variant="outlined" padding="md">

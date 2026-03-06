@@ -2,14 +2,39 @@
  * Tema de React Native Paper (Material Design 3) para Cuentas Claras
  */
 
-import { MD3LightTheme, MD3DarkTheme, MD3Theme } from 'react-native-paper';
+import { MD3LightTheme, MD3DarkTheme, MD3Theme, configureFonts } from 'react-native-paper';
 import { lightColorScheme, darkColorScheme } from './colors';
 import { borderRadius } from './spacing';
+import { fontFamily } from './typography';
+
+// ── Configuracion de fuentes Inter para Paper ───────────────────────────────
+const baseFont = {
+  fontFamily: fontFamily.regular,
+} as const;
+
+const fontConfig = {
+  displayLarge: { ...baseFont, fontFamily: fontFamily.extrabold },
+  displayMedium: { ...baseFont, fontFamily: fontFamily.bold },
+  displaySmall: { ...baseFont, fontFamily: fontFamily.bold },
+  headlineLarge: { ...baseFont, fontFamily: fontFamily.bold },
+  headlineMedium: { ...baseFont, fontFamily: fontFamily.bold },
+  headlineSmall: { ...baseFont, fontFamily: fontFamily.semibold },
+  titleLarge: { ...baseFont, fontFamily: fontFamily.semibold },
+  titleMedium: { ...baseFont, fontFamily: fontFamily.medium },
+  titleSmall: { ...baseFont, fontFamily: fontFamily.medium },
+  bodyLarge: { ...baseFont },
+  bodyMedium: { ...baseFont },
+  bodySmall: { ...baseFont },
+  labelLarge: { ...baseFont, fontFamily: fontFamily.medium },
+  labelMedium: { ...baseFont, fontFamily: fontFamily.medium },
+  labelSmall: { ...baseFont, fontFamily: fontFamily.medium },
+} as const;
 
 // ── Tema claro ──────────────────────────────────────────────────────────────
 export const lightPaperTheme: MD3Theme = {
   ...MD3LightTheme,
   roundness: borderRadius.md,
+  fonts: configureFonts({ config: fontConfig }) as MD3Theme['fonts'],
   colors: {
     ...MD3LightTheme.colors,
     primary: lightColorScheme.primary,
@@ -59,6 +84,7 @@ export const lightPaperTheme: MD3Theme = {
 export const darkPaperTheme: MD3Theme = {
   ...MD3DarkTheme,
   roundness: borderRadius.md,
+  fonts: configureFonts({ config: fontConfig }) as MD3Theme['fonts'],
   colors: {
     ...MD3DarkTheme.colors,
     primary: darkColorScheme.primary,
