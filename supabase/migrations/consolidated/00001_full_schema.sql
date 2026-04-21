@@ -6,8 +6,8 @@
 -- ║  aplicadas. Para bases existentes, usar los archivos individuales       ║
 -- ║  de migracion (00001 a 00012).                                          ║
 -- ║                                                                         ║
--- ║  Consolida migraciones: 00001 a 00016                                   ║
--- ║  Generado: 2026-02-16                                                   ║
+-- ║  Consolida migraciones: 00001 a 00020                                   ║
+-- ║  Generado: 2026-04-21                                                   ║
 -- ╚═══════════════════════════════════════════════════════════════════════════╝
 
 -- ============================================================
@@ -79,6 +79,10 @@ CREATE TABLE seasons (
 CREATE UNIQUE INDEX idx_seasons_current
   ON seasons (is_current) WHERE is_current = true;
 
+-- Índice parcial: máximo un rubro favorito por vez
+CREATE UNIQUE INDEX idx_categories_single_favorite
+  ON categories (is_favorite) WHERE is_favorite = true;
+
 -- 3.3 CATEGORIES (rubros)
 CREATE TABLE categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -92,6 +96,7 @@ CREATE TABLE categories (
   sort_order INTEGER NOT NULL DEFAULT 0,
   season_id UUID REFERENCES seasons(id),
   parent_category_id UUID REFERENCES categories(id),
+  is_favorite BOOLEAN NOT NULL DEFAULT false,
   created_by UUID NOT NULL REFERENCES profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -131,6 +136,7 @@ CREATE TABLE transactions (
   approved_by UUID REFERENCES profiles(id),
   approved_at TIMESTAMPTZ,
   season_id UUID REFERENCES seasons(id),
+  destination_alias TEXT,
   client_id TEXT,
   is_synced BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -269,20 +275,32 @@ CREATE INDEX idx_recurring_created_by
 -- 4. FUNCTIONS (versiones hardened de 00010)
 -- ============================================================
 
--- 4.1 Auto-create profile on signup (hardened: always 'viewer')
-CREATE OR REPLACE FUNCTION handle_new_user()
+-- 4.1 Auto-create profile on signup
+--     Primer usuario del sistema => admin. Resto => viewer.
+--     El rol nunca se lee desde raw_user_meta_data (hardened).
+--     Se prefija 'public.' y se fija search_path para que funcione
+--     cuando Supabase Auth dispara el trigger fuera de public.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_role public.user_role;
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.profiles) THEN
+    v_role := 'admin'::public.user_role;
+  ELSE
+    v_role := 'viewer'::public.user_role;
+  END IF;
+
   INSERT INTO public.profiles (id, email, full_name, role)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data ->> 'full_name', 'Usuario'),
-    'viewer'  -- SIEMPRE viewer, nunca leer rol desde metadata
+    v_role
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 4.2 Get user role (hardened: checks is_active)
 CREATE OR REPLACE FUNCTION get_user_role()
@@ -823,48 +841,96 @@ CREATE POLICY "user_own_recurring_delete" ON recurring_transactions
   USING (created_by = auth.uid());
 
 -- ============================================================
--- 7. VIEWS
+-- 7. RPCs ADICIONALES
 -- ============================================================
 
-CREATE OR REPLACE VIEW category_balances AS
-SELECT
-  c.id AS category_id,
-  c.name AS category_name,
-  c.color,
-  c.icon,
-  c.season_id,
-  c.budget_limit_ars,
-  c.budget_limit_usd,
-  c.is_active,
-  COALESCE(SUM(CASE
-    WHEN t.type = 'income' AND t.status = 'approved'
-    THEN t.amount_in_ars ELSE 0
-  END), 0) AS total_income_ars,
-  COALESCE(SUM(CASE
-    WHEN t.type = 'expense' AND t.status = 'approved'
-    THEN t.amount_in_ars ELSE 0
-  END), 0) AS total_expenses_ars,
-  COALESCE(SUM(CASE
-    WHEN t.type = 'transfer' AND t.status = 'approved' AND t.category_id = c.id
-    THEN -t.amount_in_ars ELSE 0
-  END), 0) +
-  COALESCE(SUM(CASE
-    WHEN t.type = 'transfer' AND t.status = 'approved' AND t.transfer_to_category_id = c.id
-    THEN t.amount_in_ars ELSE 0
-  END), 0) AS net_transfers_ars,
-  COALESCE(SUM(CASE
-    WHEN t.type = 'income' AND t.status = 'approved'
-    THEN t.amount_in_ars ELSE 0
-  END), 0)
-  - COALESCE(SUM(CASE
-    WHEN t.type = 'expense' AND t.status = 'approved'
-    THEN t.amount_in_ars ELSE 0
-  END), 0) AS balance_ars,
-  COUNT(t.id) AS transaction_count
-FROM categories c
-LEFT JOIN transactions t ON (t.category_id = c.id OR t.transfer_to_category_id = c.id)
-GROUP BY c.id, c.name, c.color, c.icon, c.season_id,
-         c.budget_limit_ars, c.budget_limit_usd, c.is_active;
+-- 7.1 Balances por categoría (SECURITY INVOKER: respeta RLS del usuario)
+CREATE OR REPLACE FUNCTION get_category_balances(p_season_id UUID DEFAULT NULL)
+RETURNS JSON AS $$
+DECLARE
+  result JSON;
+BEGIN
+  SELECT json_agg(row_data ORDER BY balance_ars DESC) INTO result
+  FROM (
+    SELECT
+      c.id AS category_id,
+      c.name AS category_name,
+      c.color,
+      c.icon,
+      c.season_id,
+      c.budget_limit_ars,
+      c.budget_limit_usd,
+      c.is_active,
+      COALESCE(SUM(CASE
+        WHEN t.type = 'income' AND t.status = 'approved' AND t.category_id = c.id
+        THEN t.amount_in_ars ELSE 0
+      END), 0) AS total_income_ars,
+      COALESCE(SUM(CASE
+        WHEN t.type = 'expense' AND t.status = 'approved' AND t.category_id = c.id
+        THEN t.amount_in_ars ELSE 0
+      END), 0) AS total_expenses_ars,
+      COALESCE(SUM(CASE
+        WHEN t.type = 'transfer' AND t.status = 'approved' AND t.category_id = c.id
+        THEN -t.amount_in_ars ELSE 0
+      END), 0) +
+      COALESCE(SUM(CASE
+        WHEN t.type = 'transfer' AND t.status = 'approved' AND t.transfer_to_category_id = c.id
+        THEN t.amount_in_ars ELSE 0
+      END), 0) AS net_transfers_ars,
+      COALESCE(SUM(CASE
+        WHEN t.type = 'income' AND t.status = 'approved' AND t.category_id = c.id
+        THEN t.amount_in_ars ELSE 0
+      END), 0)
+      - COALESCE(SUM(CASE
+        WHEN t.type = 'expense' AND t.status = 'approved' AND t.category_id = c.id
+        THEN t.amount_in_ars ELSE 0
+      END), 0)
+      + COALESCE(SUM(CASE
+        WHEN t.type = 'transfer' AND t.status = 'approved' AND t.category_id = c.id
+        THEN -t.amount_in_ars ELSE 0
+      END), 0)
+      + COALESCE(SUM(CASE
+        WHEN t.type = 'transfer' AND t.status = 'approved' AND t.transfer_to_category_id = c.id
+        THEN t.amount_in_ars ELSE 0
+      END), 0) AS balance_ars,
+      COUNT(DISTINCT t.id) AS transaction_count
+    FROM categories c
+    LEFT JOIN transactions t
+      ON (t.category_id = c.id OR t.transfer_to_category_id = c.id)
+      AND (p_season_id IS NULL OR t.season_id = p_season_id)
+    WHERE c.is_active = true
+    GROUP BY c.id, c.name, c.color, c.icon, c.season_id,
+             c.budget_limit_ars, c.budget_limit_usd, c.is_active
+    HAVING COUNT(DISTINCT t.id) > 0
+  ) AS row_data;
+
+  RETURN COALESCE(result, '[]'::JSON);
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- 7.2 Marcar rubro favorito (máximo uno a la vez)
+CREATE OR REPLACE FUNCTION set_favorite_category(p_category_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE categories
+    SET is_favorite = false, updated_at = NOW()
+    WHERE is_favorite = true AND id != p_category_id;
+
+  UPDATE categories
+    SET is_favorite = true, updated_at = NOW()
+    WHERE id = p_category_id AND is_active = true;
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- 7.3 Quitar rubro favorito
+CREATE OR REPLACE FUNCTION unset_favorite_category(p_category_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE categories
+    SET is_favorite = false, updated_at = NOW()
+    WHERE id = p_category_id;
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- ============================================================
 -- 8. STORAGE BUCKETS

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Modal } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -117,18 +117,29 @@ export function DatePickerInput({
         </Text>
       )}
 
-      {showPicker && (
-        <>
-          <DateTimePicker
-            value={value}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleChange}
-            maximumDate={maximumDate}
-            minimumDate={minimumDate}
-            locale="es-AR"
-          />
-          {Platform.OS === 'ios' && (
+      {/* Android: picker nativo como diálogo flotante */}
+      {showPicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={value}
+          mode="date"
+          display="default"
+          onChange={handleChange}
+          maximumDate={maximumDate}
+          minimumDate={minimumDate}
+          locale="es-AR"
+        />
+      )}
+
+      {/* iOS: dentro de un Modal para que la rueda sea visible siempre */}
+      {Platform.OS === 'ios' && (
+        <Modal
+          visible={showPicker}
+          transparent
+          animationType="slide"
+          onRequestClose={handleDismissIOS}
+        >
+          <Pressable style={styles.iosBackdrop} onPress={handleDismissIOS} />
+          <View style={[styles.iosSheet, { backgroundColor: colors.surface }]}>
             <View style={styles.iosActions}>
               <Pressable onPress={handleDismissIOS}>
                 <Text
@@ -139,8 +150,18 @@ export function DatePickerInput({
                 </Text>
               </Pressable>
             </View>
-          )}
-        </>
+            <DateTimePicker
+              value={value}
+              mode="date"
+              display="spinner"
+              onChange={handleChange}
+              maximumDate={maximumDate}
+              minimumDate={minimumDate}
+              locale="es-AR"
+              themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+            />
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -174,7 +195,16 @@ const styles = StyleSheet.create({
   iosActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  iosBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  iosSheet: {
+    paddingBottom: spacing.lg,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
   },
 });

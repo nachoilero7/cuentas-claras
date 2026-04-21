@@ -42,17 +42,17 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Propagate font loading errors
+  // Si la fuente ya estaba registrada (CTFontManagerError 104) la app puede continuar igual
   useEffect(() => {
-    if (fontError) throw fontError;
+    if (fontError) console.warn('[Fonts]', fontError.message);
   }, [fontError]);
 
-  // Hide splash screen once fonts are loaded
+  // Hide splash screen once fonts are loaded (o si hubo error de registro previo)
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
   // Restaurar cache persistido al iniciar
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function RootLayout() {
   // Registrar push notifications
   usePushNotifications();
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded && !fontError) {
     return null;
   }
 
